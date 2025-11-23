@@ -1,5 +1,4 @@
 <resources>
     <string name="app_name">BLEAdvertise</string>
-    <string name="AdvertiseButton">Start Advertising</string>
-    <string name="StopAdvertise">Stop Advertising</string>
+    <string name="SendNotification">Send Notification</string>
 </resources>

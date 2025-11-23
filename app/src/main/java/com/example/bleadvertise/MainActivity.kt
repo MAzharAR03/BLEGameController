@@ -5,9 +5,11 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothCodecType
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
@@ -31,9 +33,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,11 +56,11 @@ private val buttonServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-0
 private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
-
+    private var buttonCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private var bluetoothGattServer: BluetoothGattServer? = null
-
+    private var connectedDevice: BluetoothDevice? = null
     private val bluetoothEnablingResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ){
@@ -71,20 +71,20 @@ class MainActivity : ComponentActivity() {
             promptEnableBluetooth()
         }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
-
+        startAdvertising()
         enableEdgeToEdge()
         setContent {
             BLEAdvertiseTheme {
                 AdvertiseScreen(
-                    isAdvertising = isAdvertising,
-                    modifier = Modifier.fillMaxSize(),
-                    onAdvertiseClick = ::startAdvertising
-                )
+                    sendPressed = ::sendPressed,
+                    modifier = Modifier.fillMaxSize())
+
                 }
             }
         }
@@ -177,12 +177,15 @@ class MainActivity : ComponentActivity() {
 
     private fun setupGattServer(){
         bluetoothGattServer = bluetoothManager.openGattServer(this, gattServerCallback)
-        val buttonCharacteristic = BluetoothGattCharacteristic(
+        buttonCharacteristic = BluetoothGattCharacteristic(
             buttonCharUuid,
-            BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY or
+                    BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_READ
         )
-        buttonCharacteristic.setValue("Button Service".toByteArray(Charsets.UTF_8))
+        buttonCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"),
+            BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
         val buttonService = BluetoothGattService(
             buttonServiceUuid,
@@ -198,8 +201,10 @@ class MainActivity : ComponentActivity() {
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             super.onConnectionStateChange(device, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                connectedDevice = device
                 Log.i("GATT", "Device connected: ${device.address}")
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                connectedDevice = null
                 Log.i("GATT", "Device disconnected: ${device.address}")
             }
         }
@@ -211,8 +216,8 @@ class MainActivity : ComponentActivity() {
             characteristic: BluetoothGattCharacteristic
         ) {
             if (characteristic.uuid == buttonCharUuid) {
-                val batteryLevel: Byte = 100.toByte() // Example value
-                bluetoothGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, byteArrayOf(batteryLevel))
+                val buttonByte = 1.toByte()// Example value
+                bluetoothGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, byteArrayOf(buttonByte))
             }
         }
     }
@@ -257,6 +262,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun sendPressed(){
+        buttonCharacteristic?.value = byteArrayOf(1)
+        bluetoothGattServer?.notifyCharacteristicChanged(
+            connectedDevice,
+            buttonCharacteristic,
+            false
+        )
+    }
+
 }
 
 fun Context.hasPermission(permissionType: String): Boolean {
@@ -277,19 +291,15 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 @Composable
 fun AdvertiseScreen(
     modifier: Modifier = Modifier,
-    onAdvertiseClick:() -> Unit,
-    isAdvertising: Boolean) {
+    sendPressed:() -> Unit, ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Button(onClick = { onAdvertiseClick() }) {
-            if (!isAdvertising) {
-                Text(stringResource(R.string.AdvertiseButton))
-            } else {
-                Text(stringResource(R.string.StopAdvertise))
-            }
+        Button(onClick = {sendPressed  }) {
+            Text(stringResource(R.string.SendNotification))
+
         }
     }
 }
@@ -298,8 +308,7 @@ fun AdvertiseScreen(
 @Composable
 fun AdvertiseApp(){
     AdvertiseScreen(
-        onAdvertiseClick = {},
-        isAdvertising = false,
+        sendPressed = {},
         modifier = Modifier.fillMaxSize()
     )
 }
