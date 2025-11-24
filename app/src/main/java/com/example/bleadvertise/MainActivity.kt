@@ -220,7 +220,45 @@ class MainActivity : ComponentActivity() {
                 bluetoothGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, byteArrayOf(buttonByte))
             }
         }
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray
+        ) {
+            Log.i("GATT", "onDescriptorWriteRequest: ${descriptor.uuid}")
+
+            if (descriptor.uuid == UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")) {
+                // This is the CCCD (Client Characteristic Configuration Descriptor)
+                if (responseNeeded) {
+                    bluetoothGattServer?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_SUCCESS,
+                        0,
+                        value
+                    )
+                    Log.i("GATT", "Notification subscription confirmed")
+                }
+            } else {
+                if (responseNeeded) {
+                    bluetoothGattServer?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_FAILURE,
+                        0,
+                        null
+                    )
+                }
+            }
+        }
     }
+
+    // ADD THIS METHOD - This is what's missing!
+
 
     private var isAdvertising by mutableStateOf(false)
     private fun startAdvertising() {
@@ -297,7 +335,7 @@ fun AdvertiseScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Button(onClick = {sendPressed  }) {
+        Button(onClick = {sendPressed()  }) {
             Text(stringResource(R.string.SendNotification))
 
         }
