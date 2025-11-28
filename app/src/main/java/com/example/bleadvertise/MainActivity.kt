@@ -46,21 +46,38 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.bleadvertise.ui.theme.BLEAdvertiseTheme
+import com.example.bleadvertise.ui.theme.Orientation
+import com.example.sensorguide.Accelerometer
+import com.example.sensorguide.MeasurableSensor
+import com.example.sensorguide.StepDetector
 
 
 import java.util.UUID
+import kotlin.math.abs
+
 private const val PERMISSION_REQUEST_CODE = 1
 // Example UUIDs — generate your own unique ones if needed
-private val buttonServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-00805f9b34fb")
-
+private val phoneIOServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-00805f9b34fb")
 private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
+private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
+private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
+private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
     private var buttonCharacteristic: BluetoothGattCharacteristic? = null
+    private var tiltCharacteristic: BluetoothGattCharacteristic? = null
+    private var stepCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private var bluetoothGattServer: BluetoothGattServer? = null
     private var connectedDevice: BluetoothDevice? = null
+
+    private val TILT_UPDATE_INTERVAL_MS = 200L
+    private var lastTiltSpendTime = 0L
+    private var lastSentTilt = 0f
+    private val TILT_THRESHOLD = 1.0f
+    private var isGattServerSetup = false
+
     private val bluetoothEnablingResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ){
@@ -72,9 +89,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    var x = mutableStateOf(0f)
+    var y = mutableStateOf(0f)
+    var stepSensor: MeasurableSensor? = null
+    var accelerometer: MeasurableSensor? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.ACTIVITY_RECOGNITION), 1)
+        }
 
+        stepSensor = StepDetector(this)
+        accelerometer = Accelerometer(this)
         bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         startAdvertising()
@@ -94,6 +122,57 @@ class MainActivity : ComponentActivity() {
         if (!bluetoothAdapter.isEnabled) {
             promptEnableBluetooth()
         }
+        stepSensor?.startListening()
+        stepSensor?.setOnSensorValuesChangedListener {sendStep()}
+        accelerometer?.startListening()
+        accelerometer?.setOnSensorValuesChangedListener { values ->
+            x.value = values[0]
+            y.value = values[1]
+            var orientation = calculateTilt(x.value,y.value)
+            val currentTime = System.currentTimeMillis()
+            if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
+                && abs(orientation.tilt - lastSentTilt) > TILT_THRESHOLD)
+            {
+                sendTilt(orientation)
+                lastTiltSpendTime = currentTime
+                lastSentTilt = orientation.tilt
+            }
+}
+    }
+
+
+    private fun calculateTilt(x: Float, y: Float): Orientation {
+        var tilt = 0f
+        var orientation = "Center"
+        var rightSideUp = x > 0
+        when {
+            x > 9 -> rightSideUp = true
+            x < -9 -> rightSideUp = false
+        }
+        when {
+            y < 0.5 && y > -0.5 -> orientation = "Center"
+            y < -0.5 -> {
+                if (rightSideUp) {
+                    orientation = "Tilt Left"
+                    tilt = (y + 0.5f) * 10
+                } else {
+                    orientation = "Tilt Right"
+                    tilt = -(y + 0.5f) * 10
+                }
+            }
+
+            y > 0.5 -> {
+                if (rightSideUp) {
+                    orientation = "Tilt Right"
+                    tilt = (y - 0.5f) * 10
+                } else {
+                    orientation = "Tilt Left"
+                    tilt = -(y - 0.5f) * 10
+                }
+            }
+
+        }
+        return Orientation(orientation = orientation, tilt = tilt)
     }
 
     private fun Activity.requestRelevantRuntimePermissions() {
@@ -176,6 +255,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setupGattServer(){
+        if (isGattServerSetup) {
+            Log.w("BLE", "GATT server already set up")
+            return
+        }
         bluetoothGattServer = bluetoothManager.openGattServer(this, gattServerCallback)
         buttonCharacteristic = BluetoothGattCharacteristic(
             buttonCharUuid,
@@ -184,16 +267,41 @@ class MainActivity : ComponentActivity() {
             BluetoothGattCharacteristic.PERMISSION_READ
         )
         buttonCharacteristic?.addDescriptor(BluetoothGattDescriptor(
-            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"),
+            CCCDUUID,
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
-        val buttonService = BluetoothGattService(
-            buttonServiceUuid,
-            BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        tiltCharacteristic = BluetoothGattCharacteristic(
+            tiltCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY or
+                    BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
 
+        tiltCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+            CCCDUUID,
+            BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
+
+        stepCharacteristic = BluetoothGattCharacteristic(
+            stepCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY or
+                    BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+
+        stepCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+            CCCDUUID,
+            BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
+
+        val phoneIOService = BluetoothGattService(
+            phoneIOServiceUuid,
+            BluetoothGattService.SERVICE_TYPE_PRIMARY)
         //add the characteristic to the service
-        buttonService.addCharacteristic(buttonCharacteristic)
-        bluetoothGattServer?.addService(buttonService)
+        phoneIOService.addCharacteristic(buttonCharacteristic)
+        phoneIOService.addCharacteristic(tiltCharacteristic)
+        phoneIOService.addCharacteristic(stepCharacteristic)
+        bluetoothGattServer?.addService(phoneIOService)
+
+        isGattServerSetup = true
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
@@ -220,6 +328,8 @@ class MainActivity : ComponentActivity() {
                 bluetoothGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, byteArrayOf(buttonByte))
             }
         }
+
+        //Double check and learn this function
         override fun onDescriptorWriteRequest(
             device: BluetoothDevice,
             requestId: Int,
@@ -231,7 +341,7 @@ class MainActivity : ComponentActivity() {
         ) {
             Log.i("GATT", "onDescriptorWriteRequest: ${descriptor.uuid}")
 
-            if (descriptor.uuid == UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")) {
+            if (descriptor.uuid == CCCDUUID) {
                 // This is the CCCD (Client Characteristic Configuration Descriptor)
                 if (responseNeeded) {
                     bluetoothGattServer?.sendResponse(
@@ -275,7 +385,7 @@ class MainActivity : ComponentActivity() {
 
             val data = AdvertiseData.Builder()
                 .setIncludeDeviceName(true)
-                .addServiceUuid(ParcelUuid(buttonServiceUuid))
+                .addServiceUuid(ParcelUuid(phoneIOServiceUuid))
                 .build()
 
             bluetoothAdapter.bluetoothLeAdvertiser.startAdvertising(
@@ -301,12 +411,39 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendPressed(){
-        buttonCharacteristic?.value = byteArrayOf(1)
-        bluetoothGattServer?.notifyCharacteristicChanged(
-            connectedDevice,
-            buttonCharacteristic,
-            false
-        )
+        connectedDevice?.let {device ->
+            buttonCharacteristic?.value = "Button Pressed".toByteArray()
+            bluetoothGattServer?.notifyCharacteristicChanged(
+                device,
+                buttonCharacteristic,
+                false
+            )
+        } ?: Log.w("BLE", "No device connected")
+
+    }
+    private fun sendStep(){
+        connectedDevice?.let {device ->
+            stepCharacteristic?.value = "Step".toByteArray()
+            bluetoothGattServer?.notifyCharacteristicChanged(
+                device,
+                stepCharacteristic,
+                false
+            )
+        } ?: Log.w("BLE", "No device connected")
+
+    }
+
+    private fun sendTilt(orientation: Orientation){
+        connectedDevice?.let {device ->
+            val string = "${orientation.orientation} : ${orientation.tilt}"
+            tiltCharacteristic?.value = string.toByteArray()
+            bluetoothGattServer?.notifyCharacteristicChanged(
+                device,
+                tiltCharacteristic,
+                false
+            )
+        } ?: Log.w("BLE", "No device connected")
+
     }
 
 }
