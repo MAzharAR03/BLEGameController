@@ -50,6 +50,7 @@ import com.example.bleadvertise.ui.theme.Orientation
 import com.example.sensorguide.Accelerometer
 import com.example.sensorguide.MeasurableSensor
 import com.example.sensorguide.StepDetector
+import java.lang.System
 
 
 import java.util.UUID
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
     private var bluetoothGattServer: BluetoothGattServer? = null
     private var connectedDevice: BluetoothDevice? = null
 
-    private val TILT_UPDATE_INTERVAL_MS = 200L
+    private val TILT_UPDATE_INTERVAL_MS = 0L
     private var lastTiltSpendTime = 0L
     private var lastSentTilt = 0f
     private val TILT_THRESHOLD = 1.0f
@@ -412,7 +413,8 @@ class MainActivity : ComponentActivity() {
 
     private fun sendPressed(){
         connectedDevice?.let {device ->
-            buttonCharacteristic?.value = "Button Pressed".toByteArray()
+            val currentTime = System.currentTimeMillis()
+            buttonCharacteristic?.value = "Button Pressed: $currentTime".toByteArray()
             bluetoothGattServer?.notifyCharacteristicChanged(
                 device,
                 buttonCharacteristic,
@@ -423,7 +425,8 @@ class MainActivity : ComponentActivity() {
     }
     private fun sendStep(){
         connectedDevice?.let {device ->
-            stepCharacteristic?.value = "Step".toByteArray()
+            val currentTime = System.currentTimeMillis()
+            stepCharacteristic?.value = "Step: $currentTime".toByteArray()
             bluetoothGattServer?.notifyCharacteristicChanged(
                 device,
                 stepCharacteristic,
@@ -435,7 +438,8 @@ class MainActivity : ComponentActivity() {
 
     private fun sendTilt(orientation: Orientation){
         connectedDevice?.let {device ->
-            val string = "${orientation.orientation} : ${orientation.tilt}"
+            val currentTime = System.currentTimeMillis()
+            val string = "${orientation.orientation} : ${orientation.tilt} : $currentTime"
             tiltCharacteristic?.value = string.toByteArray()
             bluetoothGattServer?.notifyCharacteristicChanged(
                 device,
