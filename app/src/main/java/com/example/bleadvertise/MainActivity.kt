@@ -24,6 +24,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.ParcelUuid
+import android.os.SystemClock
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -62,12 +63,14 @@ private val phoneIOServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-
 private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
 private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
 private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
+private val messageCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35")
 private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
     private var buttonCharacteristic: BluetoothGattCharacteristic? = null
     private var tiltCharacteristic: BluetoothGattCharacteristic? = null
     private var stepCharacteristic: BluetoothGattCharacteristic? = null
+    private var messageCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private var bluetoothGattServer: BluetoothGattServer? = null
@@ -293,6 +296,14 @@ class MainActivity : ComponentActivity() {
             CCCDUUID,
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
+        messageCharacteristic = BluetoothGattCharacteristic(
+            messageCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE
+        )
+        
+
+
         val phoneIOService = BluetoothGattService(
             phoneIOServiceUuid,
             BluetoothGattService.SERVICE_TYPE_PRIMARY)
@@ -300,6 +311,7 @@ class MainActivity : ComponentActivity() {
         phoneIOService.addCharacteristic(buttonCharacteristic)
         phoneIOService.addCharacteristic(tiltCharacteristic)
         phoneIOService.addCharacteristic(stepCharacteristic)
+        phoneIOService.addCharacteristic(messageCharacteristic)
         bluetoothGattServer?.addService(phoneIOService)
 
         isGattServerSetup = true
@@ -366,6 +378,43 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        override fun onCharacteristicWriteRequest(
+            device: BluetoothDevice?,
+            requestId: Int,
+            characteristic: BluetoothGattCharacteristic?,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            super.onCharacteristicWriteRequest(
+                device,
+                requestId,
+                characteristic,
+                preparedWrite,
+                responseNeeded,
+                offset,
+                value
+            )
+            if (responseNeeded) {
+                bluetoothGattServer?.sendResponse(
+                    device,
+                    requestId,
+                    BluetoothGatt.GATT_SUCCESS,
+                    offset,
+                    value
+                )
+            }
+            when(characteristic?.uuid){
+                messageCharUUID -> {
+                    Log.d("BLE", "Message Received: ${System.currentTimeMillis()}")
+                }
+                else -> {
+                    Log.d("BLE", "Write to unknown characteristic")
+                }
+            }
+        }
     }
 
     // ADD THIS METHOD - This is what's missing!
@@ -414,12 +463,22 @@ class MainActivity : ComponentActivity() {
     private fun sendPressed(){
         connectedDevice?.let {device ->
             val currentTime = System.currentTimeMillis()
+            Log.d("BLE", "Message Sent: ${System.currentTimeMillis()}")
             buttonCharacteristic?.value = "Button Pressed: $currentTime".toByteArray()
-            bluetoothGattServer?.notifyCharacteristicChanged(
-                device,
-                buttonCharacteristic,
-                false
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                bluetoothGattServer?.notifyCharacteristicChanged(
+                    device,
+                    buttonCharacteristic!!,
+                    false,
+                buttonCharacteristic!!.value
+                )
+            } else {
+                bluetoothGattServer?.notifyCharacteristicChanged(
+                    device,
+                    buttonCharacteristic,
+                    false
+                )
+            }
         } ?: Log.w("BLE", "No device connected")
 
     }
