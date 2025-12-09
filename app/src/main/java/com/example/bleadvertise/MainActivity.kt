@@ -51,20 +51,51 @@ import com.example.bleadvertise.ui.theme.Orientation
 import com.example.sensorguide.Accelerometer
 import com.example.sensorguide.MeasurableSensor
 import com.example.sensorguide.StepDetector
+import java.lang.Math.pow
 import java.lang.System
 
 
 import java.util.UUID
 import kotlin.math.abs
+import kotlin.math.atan
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 private const val PERMISSION_REQUEST_CODE = 1
 // Example UUIDs — generate your own unique ones if needed
 private val phoneIOServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-00805f9b34fb")
-private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
+//private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
+private val buttonCharUuid: UUID = UUID.fromString("00002a4d-0000-1000-8000-00805f9b34fb")
 private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
 private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
 private val messageCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35")
 private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+private val REPORT_MAP_UUID = UUID.fromString("00002a4b-0000-1000-8000-00805f9b34fb")
+private val HID_SERVICE_UUID: UUID = UUID.fromString("00001812-0000-1000-8000-00805f9b34fb")
+private val PROTOCOL_MODE_UUID: UUID = UUID.fromString("00002a4e-0000-1000-8000-00805f9b34fb")
+private val HID_INFORMATION_UUID = UUID.fromString("00002a4a-0000-1000-8000-00805f9b34fb")
+private val HID_CONTROL_POINT_UUID = UUID.fromString("00002a4c-0000-1000-8000-00805f9b34fb")
+private val REPORT_MAP = byteArrayOf(
+    0x05.toByte(), 0x01.toByte(), //Usage Page (Generic desktop)
+    0x09.toByte(), 0x05.toByte(), //usage (game pad)
+    0xA1.toByte(), 0x01.toByte(), //Collection (application)
+
+    0x05.toByte(), 0x09.toByte(),        // Usage Page (Button)
+    0x19.toByte(), 0x01.toByte(),        // Usage Minimum (Button 1)
+    0x29.toByte(), 0x01.toByte(),        // Usage Maximum (Button 1)
+    0x15.toByte(), 0x00.toByte(),        // Logical Minimum (0)
+    0x25.toByte(), 0x01.toByte(),        // Logical Maximum (1)
+    0x75.toByte(), 0x01.toByte(),        // Report Size (1 bit)
+    0x95.toByte(), 0x01.toByte(),        // Report Count (1)
+    0x81.toByte(), 0x02.toByte(),        // Input (Data, Variable, Absolute)
+
+    // Padding (7 bits to complete the byte)
+    0x75.toByte(), 0x07.toByte(),        // Report Size (7 bits)
+    0x95.toByte(), 0x01.toByte(),        // Report Count (1)
+    0x81.toByte(), 0x03.toByte(),        // Input (Constant) - padding
+
+    0xC0.toByte()
+)
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
     private var buttonCharacteristic: BluetoothGattCharacteristic? = null
@@ -144,7 +175,9 @@ class MainActivity : ComponentActivity() {
 }
     }
 
-
+    private fun calculatePitch(x: Float, y: Float, z: Float): Double {
+        return  atan2(-y.toDouble(), sqrt(x * x + z * z).toDouble())
+    }
     private fun calculateTilt(x: Float, y: Float): Orientation {
         var tilt = 0f
         var orientation = "Center"
@@ -301,19 +334,63 @@ class MainActivity : ComponentActivity() {
             BluetoothGattCharacteristic.PROPERTY_WRITE,
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
-        
+
+        val hidInfoChar = BluetoothGattCharacteristic(
+            HID_INFORMATION_UUID,
+            BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+        hidInfoChar.value = byteArrayOf(0x11, 0x01, 0x00, 0x03, 0x034, 0x12, 0x78, 0x56, 0x01, 0x00)
+
+        val reportMapChar = BluetoothGattCharacteristic(
+            REPORT_MAP_UUID,
+            BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+        reportMapChar.value = REPORT_MAP
+
+        val reportRefDescriptor = BluetoothGattDescriptor(
+            UUID.fromString("00002908-0000-1000-8000-00805f9b34fb"),
+            BluetoothGattDescriptor.PERMISSION_READ
+        )
+        reportRefDescriptor.value = byteArrayOf(0x00, 0x01)
+        buttonCharacteristic?.addDescriptor(reportRefDescriptor)
+
+        val protocolModeChar = BluetoothGattCharacteristic(
+            PROTOCOL_MODE_UUID,
+            BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+            BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
+        )
+
+        protocolModeChar.value = byteArrayOf(0x01)
+
+        val controlPointChar = BluetoothGattCharacteristic(
+            HID_CONTROL_POINT_UUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE
+        )
+
+        val hidService = BluetoothGattService(
+            HID_SERVICE_UUID,
+            BluetoothGattService.SERVICE_TYPE_PRIMARY
+        )
+        hidService.addCharacteristic(buttonCharacteristic)
+        hidService.addCharacteristic(hidInfoChar)
+        hidService.addCharacteristic(controlPointChar)
+        hidService.addCharacteristic(reportMapChar)
+        hidService.addCharacteristic(protocolModeChar)
 
 
         val phoneIOService = BluetoothGattService(
             phoneIOServiceUuid,
             BluetoothGattService.SERVICE_TYPE_PRIMARY)
         //add the characteristic to the service
-        phoneIOService.addCharacteristic(buttonCharacteristic)
+        //phoneIOService.addCharacteristic(buttonCharacteristic)
         phoneIOService.addCharacteristic(tiltCharacteristic)
         phoneIOService.addCharacteristic(stepCharacteristic)
         phoneIOService.addCharacteristic(messageCharacteristic)
         bluetoothGattServer?.addService(phoneIOService)
-
+        bluetoothGattServer?.addService(hidService)
         isGattServerSetup = true
     }
 
@@ -436,6 +513,7 @@ class MainActivity : ComponentActivity() {
             val data = AdvertiseData.Builder()
                 .setIncludeDeviceName(true)
                 .addServiceUuid(ParcelUuid(phoneIOServiceUuid))
+                .addServiceUuid(ParcelUuid(HID_SERVICE_UUID))
                 .build()
 
             bluetoothAdapter.bluetoothLeAdvertiser.startAdvertising(
@@ -464,7 +542,8 @@ class MainActivity : ComponentActivity() {
         connectedDevice?.let {device ->
             val currentTime = System.currentTimeMillis()
             Log.d("BLE", "Message Sent: ${System.currentTimeMillis()}")
-            buttonCharacteristic?.value = "Button Pressed: $currentTime".toByteArray()
+            val report = byteArrayOf(0x01)
+            buttonCharacteristic?.value = report
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
