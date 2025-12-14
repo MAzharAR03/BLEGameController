@@ -56,6 +56,8 @@ import java.lang.System
 
 import java.util.UUID
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 private const val PERMISSION_REQUEST_CODE = 1
 // Example UUIDs — generate your own unique ones if needed
@@ -78,8 +80,8 @@ class MainActivity : ComponentActivity() {
 
     private val TILT_UPDATE_INTERVAL_MS = 0L
     private var lastTiltSpendTime = 0L
-    private var lastSentTilt = 0f
-    private val TILT_THRESHOLD = 1.0f
+    private var lastSentTilt : Double = 0.0
+    private val TILT_THRESHOLD = 0.01
     private var isGattServerSetup = false
 
     private val bluetoothEnablingResult = registerForActivityResult(
@@ -95,6 +97,7 @@ class MainActivity : ComponentActivity() {
 
     var x = mutableStateOf(0f)
     var y = mutableStateOf(0f)
+    var z = mutableStateOf(0f)
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
 
@@ -132,51 +135,22 @@ class MainActivity : ComponentActivity() {
         accelerometer?.setOnSensorValuesChangedListener { values ->
             x.value = values[0]
             y.value = values[1]
-            var orientation = calculateTilt(x.value,y.value)
+            z.value = values[2]
+            var tilt = calculatePitch(x.value,y.value,z.value)
             val currentTime = System.currentTimeMillis()
             if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
-                && abs(orientation.tilt - lastSentTilt) > TILT_THRESHOLD)
+                && abs(tilt - lastSentTilt) > TILT_THRESHOLD)
             {
-                sendTilt(orientation)
+                sendTilt(tilt)
                 lastTiltSpendTime = currentTime
-                lastSentTilt = orientation.tilt
+                lastSentTilt = tilt
             }
 }
     }
 
 
-    private fun calculateTilt(x: Float, y: Float): Orientation {
-        var tilt = 0f
-        var orientation = "Center"
-        var rightSideUp = x > 0
-        when {
-            x > 9 -> rightSideUp = true
-            x < -9 -> rightSideUp = false
-        }
-        when {
-            y < 0.5 && y > -0.5 -> orientation = "Center"
-            y < -0.5 -> {
-                if (rightSideUp) {
-                    orientation = "Tilt Left"
-                    tilt = (y + 0.5f) * 10
-                } else {
-                    orientation = "Tilt Right"
-                    tilt = -(y + 0.5f) * 10
-                }
-            }
-
-            y > 0.5 -> {
-                if (rightSideUp) {
-                    orientation = "Tilt Right"
-                    tilt = (y - 0.5f) * 10
-                } else {
-                    orientation = "Tilt Left"
-                    tilt = -(y - 0.5f) * 10
-                }
-            }
-
-        }
-        return Orientation(orientation = orientation, tilt = tilt)
+    private fun calculatePitch(x: Float, y: Float, z: Float): Double {
+        return  atan2(-y.toDouble(), sqrt(x * x + z * z).toDouble())
     }
 
     private fun Activity.requestRelevantRuntimePermissions() {
@@ -495,10 +469,9 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    private fun sendTilt(orientation: Orientation){
+    private fun sendTilt(tilt: Double){
         connectedDevice?.let {device ->
-            val currentTime = System.currentTimeMillis()
-            val string = "${orientation.orientation} : ${orientation.tilt} : $currentTime"
+            val string = "$tilt"
             tiltCharacteristic?.value = string.toByteArray()
             bluetoothGattServer?.notifyCharacteristicChanged(
                 device,
