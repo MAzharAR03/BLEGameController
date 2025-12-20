@@ -436,9 +436,9 @@ class MainActivity : ComponentActivity() {
 
     private fun sendPressed(){
         connectedDevice?.let {device ->
-            val currentTime = System.currentTimeMillis()
-            Log.d("BLE", "Message Sent: ${System.currentTimeMillis()}")
-            buttonCharacteristic?.value = "Button Pressed: $currentTime".toByteArray()
+            //val currentTime = System.currentTimeMillis()
+           //Log.d("BLE", "Message Sent: ${System.currentTimeMillis()}")
+            buttonCharacteristic?.value = "Button: Button1".toByteArray()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
@@ -458,8 +458,7 @@ class MainActivity : ComponentActivity() {
     }
     private fun sendStep(){
         connectedDevice?.let {device ->
-            val currentTime = System.currentTimeMillis()
-            stepCharacteristic?.value = "Step: $currentTime".toByteArray()
+            stepCharacteristic?.value = "Step:".toByteArray()
             bluetoothGattServer?.notifyCharacteristicChanged(
                 device,
                 stepCharacteristic,
@@ -471,7 +470,7 @@ class MainActivity : ComponentActivity() {
 
     private fun sendTilt(tilt: Double){
         connectedDevice?.let {device ->
-            val string = "$tilt"
+            val string = "Tilt: $tilt"
             tiltCharacteristic?.value = string.toByteArray()
             bluetoothGattServer?.notifyCharacteristicChanged(
                 device,
