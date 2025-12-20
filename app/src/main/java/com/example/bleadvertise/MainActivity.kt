@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
             if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
                 && abs(tilt - lastSentTilt) > TILT_THRESHOLD)
             {
-                sendTilt(tilt)
+                //sendTilt(tilt)
                 lastTiltSpendTime = currentTime
                 lastSentTilt = tilt
             }
