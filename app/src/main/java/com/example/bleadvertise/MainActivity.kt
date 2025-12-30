@@ -1,11 +1,11 @@
 package com.example.bleadvertise
 
 import android.Manifest
+import android.R
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothCodecType
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -24,30 +24,30 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.ParcelUuid
-import android.os.SystemClock
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.bleadvertise.ui.theme.BLEAdvertiseTheme
-import com.example.bleadvertise.ui.theme.Orientation
 import com.example.sensorguide.Accelerometer
 import com.example.sensorguide.MeasurableSensor
 import com.example.sensorguide.StepDetector
@@ -67,12 +67,15 @@ private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d
 private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
 private val messageCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35")
 private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+private val layoutCharUUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b")
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
     private var buttonCharacteristic: BluetoothGattCharacteristic? = null
     private var tiltCharacteristic: BluetoothGattCharacteristic? = null
     private var stepCharacteristic: BluetoothGattCharacteristic? = null
     private var messageCharacteristic: BluetoothGattCharacteristic? = null
+    private var layoutCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private var bluetoothGattServer: BluetoothGattServer? = null
@@ -100,16 +103,17 @@ class MainActivity : ComponentActivity() {
     var z = mutableStateOf(0f)
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
+    val layoutParser = LayoutParser("Test.json", this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION)
-            != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.ACTIVITY_RECOGNITION), 1)
+        if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
+            != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
         }
 
-        stepSensor = StepDetector(this)
-        accelerometer = Accelerometer(this)
+        stepSensor = StepDetector(this,0)
+        accelerometer = Accelerometer(this,1)
         bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         startAdvertising()
@@ -117,12 +121,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             BLEAdvertiseTheme {
                 AdvertiseScreen(
-                    sendPressed = ::sendPressed,
-                    modifier = Modifier.fillMaxSize())
-
-                }
+                    sendPressed = ::sendPressed
+                )
             }
         }
+    }
 
     override fun onResume() {
         super.onResume()
@@ -136,16 +139,16 @@ class MainActivity : ComponentActivity() {
             x.value = values[0]
             y.value = values[1]
             z.value = values[2]
-            var tilt = calculatePitch(x.value,y.value,z.value)
+            val tilt = calculatePitch(x.value,y.value,z.value)
             val currentTime = System.currentTimeMillis()
             if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
                 && abs(tilt - lastSentTilt) > TILT_THRESHOLD)
             {
-                //sendTilt(tilt)
+                sendTilt(tilt)
                 lastTiltSpendTime = currentTime
                 lastSentTilt = tilt
             }
-}
+        }
     }
 
 
@@ -169,7 +172,7 @@ class MainActivity : ComponentActivity() {
             .setMessage("Starting from Android 12, the system requires apps to be granted " +
                     "Bluetooth access in order to scan for and connect to BLE devices.")
             .setCancelable(false)
-            .setPositiveButton(android.R.string.ok) {_, _ ->
+            .setPositiveButton(R.string.ok) { _, _ ->
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(
@@ -204,7 +207,7 @@ class MainActivity : ComponentActivity() {
                 AlertDialog.Builder(this)
                     .setTitle("Permission Denied")
                     .setMessage("Cannot scan for BLE devices without the required permissions.")
-                    .setPositiveButton(android.R.string.ok, null)
+                    .setPositiveButton(R.string.ok, null)
                     .show()
             }
             containsDenial -> {
@@ -275,7 +278,12 @@ class MainActivity : ComponentActivity() {
             BluetoothGattCharacteristic.PROPERTY_WRITE,
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
-        
+
+        layoutCharacteristic = BluetoothGattCharacteristic(
+            layoutCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE
+        )
 
 
         val phoneIOService = BluetoothGattService(
@@ -286,6 +294,7 @@ class MainActivity : ComponentActivity() {
         phoneIOService.addCharacteristic(tiltCharacteristic)
         phoneIOService.addCharacteristic(stepCharacteristic)
         phoneIOService.addCharacteristic(messageCharacteristic)
+        phoneIOService.addCharacteristic(layoutCharacteristic)
         bluetoothGattServer?.addService(phoneIOService)
 
         isGattServerSetup = true
@@ -390,10 +399,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    // ADD THIS METHOD - This is what's missing!
-
-
     private var isAdvertising by mutableStateOf(false)
     private fun startAdvertising() {
         if (!hasRequiredBluetoothPermissions()) {
@@ -434,17 +439,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sendPressed(){
+    private fun sendPressed(text: String){
         connectedDevice?.let {device ->
-            //val currentTime = System.currentTimeMillis()
-           //Log.d("BLE", "Message Sent: ${System.currentTimeMillis()}")
-            buttonCharacteristic?.value = "Button: Button1".toByteArray()
+            buttonCharacteristic?.value = "Button: $text".toByteArray()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
                     buttonCharacteristic!!,
                     false,
-                buttonCharacteristic!!.value
+                    buttonCharacteristic!!.value
                 )
             } else {
                 bluetoothGattServer?.notifyCharacteristicChanged(
@@ -500,26 +503,50 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 
 @Composable
 fun AdvertiseScreen(
-    modifier: Modifier = Modifier,
-    sendPressed:() -> Unit, ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Button(onClick = {sendPressed()  }) {
-            Text(stringResource(R.string.SendNotification))
-
+    sendPressed: (String) -> Unit, ) {
+    val context = LocalContext.current
+    val layoutParser = remember{ LayoutParser("Test.json",context).apply {readJSON()}}
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ){
+        //Left
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            ButtonGrid(layoutParser.rows,layoutParser.columns,layoutParser.result,sendPressed)
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        )
+        {
+            CustomButton(ButtonConfig("Pause",150,150),sendPressed)
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ){
+            Button(onClick = {sendPressed("Third")}){
+                Text("Third")
+            }
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true,
+    device = "spec:width=891dp,height=411dp,dpi=420"
+)
 @Composable
 fun AdvertiseApp(){
     AdvertiseScreen(
         sendPressed = {},
-        modifier = Modifier.fillMaxSize()
     )
 }
-

@@ -9,7 +9,8 @@ import android.hardware.SensorManager
 abstract class AndroidSensor(
     private val context: Context,
     private val sensorFeature: String,
-    sensorType: Int
+    sensorType: Int,
+    val sensorDelay: Int
 ): MeasurableSensor(sensorType), SensorEventListener{
 
     override val doesSensorExist: Boolean
@@ -27,7 +28,11 @@ abstract class AndroidSensor(
             sensor = sensorManager.getDefaultSensor(sensorType)
         }
         sensor?.let{
-            sensorManager.registerListener(this,it,SensorManager.SENSOR_DELAY_GAME)
+            when(sensorDelay){
+                1 -> sensorManager.registerListener(this,it,SensorManager.SENSOR_DELAY_GAME)
+                0 -> sensorManager.registerListener(this,it, SensorManager.SENSOR_DELAY_FASTEST)
+                else -> sensorManager.registerListener(this,it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
         }
     }
 
