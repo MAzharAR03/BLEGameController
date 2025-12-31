@@ -20,8 +20,8 @@ class LayoutParser(
                         text = cell.getString(0),
                         width = cell.getInt(1),
                         height = cell.getInt(2),
-                        xOffset = cell.getInt(3),
-                        yOffset = cell.getInt(4)
+                        xOffsetRel = cell.getDouble(3).toFloat(),
+                        yOffsetRel = cell.getDouble(4).toFloat(),
                     )
                 )
                 }
