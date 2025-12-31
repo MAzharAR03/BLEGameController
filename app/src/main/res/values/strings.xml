@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">BLEAdvertise</string>
+    <string name="app_name">Azhar-BluetoothGameController</string>
     <string name="SendNotification">Send Notification</string>
 </resources>

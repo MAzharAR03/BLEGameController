@@ -1,4 +1,4 @@
-package com.example.bleadvertise
+package com.example.maahBLEController
 
 import android.Manifest
 import android.R
@@ -30,27 +30,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.bleadvertise.ui.theme.BLEAdvertiseTheme
+import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
 import com.example.sensorguide.Accelerometer
 import com.example.sensorguide.MeasurableSensor
 import com.example.sensorguide.StepDetector
+import java.io.ByteArrayOutputStream
 import java.lang.System
 
 
@@ -62,6 +54,7 @@ import kotlin.math.sqrt
 private const val PERMISSION_REQUEST_CODE = 1
 // Example UUIDs — generate your own unique ones if needed
 private val phoneIOServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-00805f9b34fb")
+
 private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
 private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
 private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
@@ -86,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private var lastSentTilt : Double = 0.0
     private val TILT_THRESHOLD = 0.01
     private var isGattServerSetup = false
+    private val appContext: Context by lazy { applicationContext }
 
     private val bluetoothEnablingResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -103,7 +97,6 @@ class MainActivity : ComponentActivity() {
     var z = mutableStateOf(0f)
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
-    val layoutParser = LayoutParser("Test.json", this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,9 +104,20 @@ class MainActivity : ComponentActivity() {
             != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
         }
+        //for android 10 and below - BLE requires location perms
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    PERMISSION_REQUEST_CODE
+                )
+            }
+        }
 
-        stepSensor = StepDetector(this,0)
-        accelerometer = Accelerometer(this,1)
+        stepSensor = StepDetector(this,"FASTEST")
+        accelerometer = Accelerometer(this,"GAME")
         bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         startAdvertising()
@@ -132,6 +136,7 @@ class MainActivity : ComponentActivity() {
         if (!bluetoothAdapter.isEnabled) {
             promptEnableBluetooth()
         }
+        startAdvertising()
         stepSensor?.startListening()
         stepSensor?.setOnSensorValuesChangedListener {sendStep()}
         accelerometer?.startListening()
@@ -142,7 +147,7 @@ class MainActivity : ComponentActivity() {
             val tilt = calculatePitch(x.value,y.value,z.value)
             val currentTime = System.currentTimeMillis()
             if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
-                && abs(tilt - lastSentTilt) > TILT_THRESHOLD)
+                && abs(tilt - lastSentTilt) >= TILT_THRESHOLD)
             {
                 sendTilt(tilt)
                 lastTiltSpendTime = currentTime
@@ -301,7 +306,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
-
+        private val buffer = ByteArrayOutputStream()
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             super.onConnectionStateChange(device, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
@@ -393,6 +398,25 @@ class MainActivity : ComponentActivity() {
                 messageCharUUID -> {
                     Log.d("BLE", "Message Received: ${System.currentTimeMillis()}")
                 }
+                layoutCharUUID -> {
+                    val message = String(value!!,Charsets.UTF_8)
+                    when {
+                        message =="START" -> {
+                            buffer.reset()
+                            Log.d("FTP","File transfer started")
+                        }
+                        message.contains("END") -> {
+                            val json = buffer.toByteArray().toString(Charsets.UTF_8)
+                            appContext.openFileOutput("layout.json",Context.MODE_PRIVATE).use{
+                                it.write(json.toByteArray())
+                            }
+                            Log.d("FTP","JSON File received")
+
+                        }
+                        else -> value.let {buffer.write(it)}
+
+                    }
+                }
                 else -> {
                     Log.d("BLE", "Write to unknown characteristic")
                 }
@@ -456,7 +480,7 @@ class MainActivity : ComponentActivity() {
                     false
                 )
             }
-        } ?: Log.w("BLE", "No device connected")
+        } //?: Log.w("BLE", "No device connected")
 
     }
     private fun sendStep(){
@@ -467,7 +491,7 @@ class MainActivity : ComponentActivity() {
                 stepCharacteristic,
                 false
             )
-        } ?: Log.w("BLE", "No device connected")
+        } //?: Log.w("BLE", "No device connected")
 
     }
 
@@ -480,7 +504,7 @@ class MainActivity : ComponentActivity() {
                 tiltCharacteristic,
                 false
             )
-        } ?: Log.w("BLE", "No device connected")
+        } //?: Log.w("BLE", "No device connected")
 
     }
 
@@ -505,44 +529,13 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 fun AdvertiseScreen(
     sendPressed: (String) -> Unit, ) {
     val context = LocalContext.current
-    val layoutParser = remember{ LayoutParser("Test.json",context).apply {readJSON()}}
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ){
-        //Left
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ) {
-            ButtonGrid(layoutParser.rows,layoutParser.columns,layoutParser.result,sendPressed)
-        }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        )
-        {
-            CustomButton(ButtonConfig("Pause",150,150),sendPressed)
-        }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ){
-            Button(onClick = {sendPressed("Third")}){
-                Text("Third")
-            }
-        }
-    }
+    val layoutParser =  LayoutParser("Test.json",context).apply {readJSON()}
+    PixelLayout(layoutParser.result,sendPressed)
 }
 
-@Preview(showBackground = true,
-    device = "spec:width=891dp,height=411dp,dpi=420"
+@Preview(
+    showBackground = true,
+    device = "spec:width = 411dp, height = 891dp, orientation = landscape, dpi = 420"
 )
 @Composable
 fun AdvertiseApp(){

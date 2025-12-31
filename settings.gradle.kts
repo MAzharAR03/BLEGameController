@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BLEAdvertise"
+rootProject.name = "Azhar-BluetoothGameController"
 include(":app")
  

@@ -1,4 +1,4 @@
-package com.example.bleadvertise.ui.theme
+package com.example.maahBLEController.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

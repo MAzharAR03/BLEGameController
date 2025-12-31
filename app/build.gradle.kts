@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.bleadvertise"
+    namespace = "com.example.maahBLEController"
     compileSdk {
         version = release(36)
     }
