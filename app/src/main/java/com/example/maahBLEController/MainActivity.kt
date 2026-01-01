@@ -535,7 +535,7 @@ fun AdvertiseScreen(
 
 @Preview(
     showBackground = true,
-    device = "spec:width = 411dp, height = 891dp, orientation = landscape, dpi = 420"
+    device = "spec:width=411dp,height=891dp,orientation=landscape,dpi=420"
 )
 @Composable
 fun AdvertiseApp(){
