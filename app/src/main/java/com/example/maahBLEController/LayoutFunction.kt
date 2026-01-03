@@ -14,11 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-//maybe need to make it a class
 //switch to relative only positioning and change size to relative sizes
-//have to figure out how to get parentSize to ButtonConfig - which resides in read JSON
-//probably have to make layout/View into a class
-//move readjson to this view class
 data class ButtonConfig(
     val text: String,
     val width: Int,

@@ -3,6 +3,7 @@ package com.example.maahBLEController
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 class LayoutParser(
     val fileName: String,
@@ -10,7 +11,18 @@ class LayoutParser(
 ) {
     val result = mutableListOf<ButtonConfig>()
     fun readJSON() {
-        val jsonString = context.assets.open(fileName).bufferedReader().use { it.readText() }
+        val jsonString = try {
+            val file = File(context.filesDir, fileName)
+            if(file.exists()){
+                file.readText()
+            } else{
+                context.assets.open(fileName).bufferedReader().use {
+                    it.readText()
+                }
+            }
+        } catch(e: Exception){
+            throw e
+        }
         val root = JSONObject(jsonString)
         val cellsArray = root.getJSONArray("cells")
         for (i in 0..<cellsArray.length()) {

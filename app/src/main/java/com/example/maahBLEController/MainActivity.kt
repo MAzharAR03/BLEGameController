@@ -25,6 +25,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.ParcelUuid
 import android.util.Log
+import android.widget.Button
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -43,10 +44,12 @@ import com.example.sensorguide.Accelerometer
 import com.example.sensorguide.MeasurableSensor
 import com.example.sensorguide.StepDetector
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.lang.System
 
 
 import java.util.UUID
+import kotlin.collections.listOf
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -95,11 +98,28 @@ class MainActivity : ComponentActivity() {
     var x = mutableStateOf(0f)
     var y = mutableStateOf(0f)
     var z = mutableStateOf(0f)
+    var layoutData = mutableStateOf<List<ButtonConfig>>(emptyList())
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
 
+    private fun copyDefaultLayout(){
+        val targetFile = File(filesDir,"Test.json")
+        if (targetFile.exists()) return
+        assets.open("Test.json").use {
+            input -> targetFile.outputStream().use {
+                output -> input.copyTo(output)
+        }
+        }
+    }
+
+    private fun loadLayout(filename: String): List<ButtonConfig>{
+        return LayoutParser(filename,this).apply {readJSON()}.result
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        copyDefaultLayout()
+        layoutData.value = loadLayout("Test.json")
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
@@ -125,7 +145,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             BLEAdvertiseTheme {
                 AdvertiseScreen(
-                    sendPressed = ::sendPressed
+                    sendPressed = ::sendPressed,
+                    layoutData.value
                 )
             }
         }
@@ -304,6 +325,14 @@ class MainActivity : ComponentActivity() {
 
         isGattServerSetup = true
     }
+    private fun restartGattServer(){
+        if(isGattServerSetup){
+            bluetoothGattServer?.close()
+            bluetoothGattServer = null
+            isGattServerSetup = false
+            bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
+        }
+    }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         private val buffer = ByteArrayOutputStream()
@@ -314,6 +343,7 @@ class MainActivity : ComponentActivity() {
                 Log.i("GATT", "Device connected: ${device.address}")
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 connectedDevice = null
+                restartGattServer()
                 Log.i("GATT", "Device disconnected: ${device.address}")
             }
         }
@@ -411,6 +441,10 @@ class MainActivity : ComponentActivity() {
                                 it.write(json.toByteArray())
                             }
                             Log.d("FTP","JSON File received")
+                            runOnUiThread {
+                                layoutData.value = loadLayout("layout.json")
+                            }
+
 
                         }
                         else -> value.let {buffer.write(it)}
@@ -527,10 +561,10 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 
 @Composable
 fun AdvertiseScreen(
-    sendPressed: (String) -> Unit, ) {
-    val context = LocalContext.current
-    val layoutParser =  LayoutParser("Test.json",context).apply {readJSON()}
-    PixelLayout(layoutParser.result,sendPressed)
+    sendPressed: (
+        String) -> Unit,
+        buttons: List<ButtonConfig>) {
+    PixelLayout(buttons,sendPressed)
 }
 
 @Preview(
@@ -539,7 +573,12 @@ fun AdvertiseScreen(
 )
 @Composable
 fun AdvertiseApp(){
+    val buttonsList = listOf(
+    ButtonConfig("Fire",50,50,0.25f,0.1f),
+    ButtonConfig("Pause",200,200,0.5f,0.5f))
+
     AdvertiseScreen(
         sendPressed = {},
+        buttonsList
     )
 }
