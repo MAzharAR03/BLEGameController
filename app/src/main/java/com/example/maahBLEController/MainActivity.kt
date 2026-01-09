@@ -25,7 +25,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.ParcelUuid
 import android.util.Log
-import android.widget.Button
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,8 +34,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
@@ -49,7 +46,6 @@ import java.lang.System
 
 
 import java.util.UUID
-import kotlin.collections.listOf
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -98,13 +94,12 @@ class MainActivity : ComponentActivity() {
     var x = mutableStateOf(0f)
     var y = mutableStateOf(0f)
     var z = mutableStateOf(0f)
-    var layoutData = mutableStateOf<List<ButtonConfig>>(emptyList())
+    lateinit var uiLayout : UIConfig
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
 
     private fun copyDefaultLayout(){
         val targetFile = File(filesDir,"Test.json")
-        if (targetFile.exists()) return
         assets.open("Test.json").use {
             input -> targetFile.outputStream().use {
                 output -> input.copyTo(output)
@@ -112,14 +107,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun loadLayout(filename: String): List<ButtonConfig>{
-        return LayoutParser(filename,this).apply {readJSON()}.result
+    private fun loadLayout(filename: String): UIConfig{
+        return LayoutParser(filename,this).apply {readJSON()}.uiConfig
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         copyDefaultLayout()
-        layoutData.value = loadLayout("Test.json")
+        uiLayout = loadLayout("Test.json")
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
@@ -146,7 +141,7 @@ class MainActivity : ComponentActivity() {
             BLEAdvertiseTheme {
                 AdvertiseScreen(
                     sendPressed = ::sendPressed,
-                    layoutData.value
+                    uiLayout
                 )
             }
         }
@@ -442,7 +437,7 @@ class MainActivity : ComponentActivity() {
                             }
                             Log.d("FTP","JSON File received")
                             runOnUiThread {
-                                layoutData.value = loadLayout("layout.json")
+                                uiLayout = loadLayout("layout.json")
                             }
 
 
@@ -563,22 +558,22 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 fun AdvertiseScreen(
     sendPressed: (
         String) -> Unit,
-        buttons: List<ButtonConfig>) {
-    PixelLayout(buttons,sendPressed)
+        uiLayout: UIConfig) {
+    PixelLayout(uiLayout,sendPressed)
 }
 
-@Preview(
-    showBackground = true,
-    device = "spec:width=411dp,height=891dp,orientation=landscape,dpi=420"
-)
-@Composable
-fun AdvertiseApp(){
-    val buttonsList = listOf(
-    ButtonConfig("Fire",50,50,0.25f,0.1f),
-    ButtonConfig("Pause",200,200,0.5f,0.5f))
-
-    AdvertiseScreen(
-        sendPressed = {},
-        buttonsList
-    )
-}
+//@Preview(
+//    showBackground = true,
+//    device = "spec:width=411dp,height=891dp,orientation=landscape,dpi=420"
+//)
+//@Composable
+//fun AdvertiseApp(){
+//    val buttonsList = listOf(
+//    ButtonConfig("Fire", 50, 50, 0.25f, 0.1f,),
+//    ButtonConfig("Pause", 200, 200, 0.5f, 0.5f,))
+//
+//    AdvertiseScreen(
+//        sendPressed = {},
+//        buttonsList
+//    )
+//}

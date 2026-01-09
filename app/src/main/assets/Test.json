@@ -1,6 +1,19 @@
 {
-  "cells": [
-    ["Fire", 100, 100, 0.2, 0.15],
-    ["Pause", 200, 200, 0.5, 0.5]
-  ]
+  "background image":"https://drive.usercontent.google.com/download?id=1D2paM-FCv_T1xcNMV4MqNImrNeRNtdNE&export=download&authuser=1&confirm=t&uuid=2b276120-65b8-4155-ac06-c590ef8d4bd6&at=ANTm3cwKn5MOJRb0w5-FKIDL4Wks:1767951462162",
+  "buttons": [
+    {
+      "text":"",
+      "textColor": "#C8A2C8",
+      "width": 300,
+      "height":300,
+      "xOffset":0.5,
+      "yOffset":0.5,
+      "shape": "rounded rectangle",
+      "color": "#C8A2C8",
+      "imageURL":"https://r1.hiclipart.com/path/139/395/752/oiu9s8sio1tnd3s3iran9s5ai4-b90b0e73cd706c2f1b7d85f9eecfc5a1.png?dl=1",
+      "rounding":14,
+      "padding":10
+    }
+  ],
+  "images": []
 }
