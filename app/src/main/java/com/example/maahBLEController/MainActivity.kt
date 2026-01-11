@@ -429,7 +429,7 @@ class MainActivity : ComponentActivity() {
                 layoutCharUUID -> {
                     val message = String(value!!,Charsets.UTF_8)
                     when {
-                        message =="START" -> {
+                        message.startsWith("START") -> {
                             buffer.reset()
                             Log.d("FTP","File transfer started")
                         }
