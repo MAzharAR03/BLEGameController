@@ -1,19 +1,27 @@
 {
-  "background image":"https://drive.usercontent.google.com/download?id=1D2paM-FCv_T1xcNMV4MqNImrNeRNtdNE&export=download&authuser=1&confirm=t&uuid=2b276120-65b8-4155-ac06-c590ef8d4bd6&at=ANTm3cwKn5MOJRb0w5-FKIDL4Wks:1767951462162",
+  "background image":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/bg3 bg.webp",
   "buttons": [
     {
-      "text":"",
+      "text":"FIRE",
       "textColor": "#C8A2C8",
-      "width": 300,
-      "height":300,
-      "xOffset":0.5,
-      "yOffset":0.5,
-      "shape": "rounded rectangle",
-      "color": "#C8A2C8",
-      "imageURL":"https://r1.hiclipart.com/path/139/395/752/oiu9s8sio1tnd3s3iran9s5ai4-b90b0e73cd706c2f1b7d85f9eecfc5a1.png?dl=1",
+      "width": 100,
+      "height":100,
+      "xOffset":0.2,
+      "yOffset":0.15,
+      "shape": "circle",
+      "color": "transparent",
+      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/fire.png",
       "rounding":14,
-      "padding":10
+      "padding":0
     }
   ],
-  "images": []
+  "images": [
+    {
+      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/Larian_Studios_Logo_2012.png",
+      "width": 100,
+      "height": 100,
+      "xOffset": 0.8,
+      "yOffset": 0.15
+    }
+  ]
 }

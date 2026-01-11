@@ -8,12 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/*
-* Have one UIConfig class which contains a list of button configs
-* and background image link
-* and imageConfig list ?
-* json file structure
-* */
+
 
 class LayoutParser(
     val fileName: String,
@@ -77,7 +72,7 @@ class LayoutParser(
                     width = cell.getInt("width"),
                     height = cell.getInt("height"),
                     xOffsetRel = cell.getDouble("xOffset").toFloat(),
-                    yOffsetRel = cell.getDouble("yOffset").toFloat(),
+                    yOffsetRel = cell.getDouble("yOffset").toFloat()
                 )
             )
         }

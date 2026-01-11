@@ -21,7 +21,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
-//switch to relative only positioning and change size to relative sizes
+/*
+transfer file over BLE
+try sending json file over godot and see if everything still works fine
+potentially change image inputs to scale sizing (maybe also buttons)
+allow contentScale option ?
+control text size
+* */
 
 interface ElementConfig{
     val width: Int
@@ -48,7 +54,7 @@ data class ImageConfig(
     override val height: Int,
     override val xOffsetRel: Float,
     override val yOffsetRel: Float,
-    val imageURL: String
+    val imageURL: String,
 ) : ElementConfig
 
 data class UIConfig(
@@ -125,6 +131,23 @@ fun PixelLayout(
                 sendButton = sendButton,
                 parentWidth = maxWidth,
                 parentHeight = maxHeight)
+        }
+        for (image in uiConfig.images){
+            AsyncImage(
+                model = image.imageURL,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(
+                        width = image.width.dp,
+                        height = image.height.dp
+                    )
+                    .offset(
+                        x = maxWidth * image.xOffsetRel - image.width.dp/2,
+                        y = maxHeight * image.yOffsetRel - image.width.dp/2)
+                    )
+
+
         }
     }
 }
