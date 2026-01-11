@@ -19,14 +19,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
 /*
 transfer file over BLE
 try sending json file over godot and see if everything still works fine
 potentially change image inputs to scale sizing (maybe also buttons)
+
+
 allow contentScale option ?
-control text size
 * */
 
 interface ElementConfig{
@@ -37,6 +39,7 @@ interface ElementConfig{
 }
 data class ButtonConfig (
     val text: String,
+    val fontSize: Int,
     override val width: Int,
     override val height: Int,
     override val xOffsetRel: Float,
@@ -55,6 +58,7 @@ data class ImageConfig(
     override val xOffsetRel: Float,
     override val yOffsetRel: Float,
     val imageURL: String,
+    val contentScale: ContentScale,
 ) : ElementConfig
 
 data class UIConfig(
@@ -104,6 +108,7 @@ fun CustomButton(
             )
             Text(
                 text = config.text,
+                fontSize = config.fontSize.sp,
                 color = Color(android.graphics.Color.parseColor(config.textColor)))
         }
 
@@ -136,7 +141,7 @@ fun PixelLayout(
             AsyncImage(
                 model = image.imageURL,
                 contentDescription = null,
-                contentScale = ContentScale.Fit,
+                contentScale = image.contentScale,
                 modifier = Modifier
                     .size(
                         width = image.width.dp,
@@ -146,8 +151,6 @@ fun PixelLayout(
                         x = maxWidth * image.xOffsetRel - image.width.dp/2,
                         y = maxHeight * image.yOffsetRel - image.width.dp/2)
                     )
-
-
         }
     }
 }

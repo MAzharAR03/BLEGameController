@@ -4,6 +4,7 @@
     {
       "text":"FIRE",
       "textColor": "#C8A2C8",
+      "textFontSize": 10,
       "width": 100,
       "height":100,
       "xOffset":0.2,
@@ -21,7 +22,8 @@
       "width": 100,
       "height": 100,
       "xOffset": 0.8,
-      "yOffset": 0.15
+      "yOffset": 0.15,
+      "contentScale": "Fit"
     }
   ]
 }
