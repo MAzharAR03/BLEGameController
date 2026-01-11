@@ -1,6 +1,8 @@
 package com.example.maahBLEController
 
 import android.annotation.SuppressLint
+import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,9 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import java.io.File
 
 /*
 transfer file over BLE
@@ -63,13 +67,14 @@ data class UIConfig(
     var backgroundImage: String
 )
 
+//make reusable AsyncImage clas
 
 @Composable
 fun CustomButton(
     config: ButtonConfig,
     sendButton: (String) -> Unit,
     parentHeight: Dp,
-    parentWidth: Dp
+    parentWidth: Dp,
 ) {
     Button(
         onClick = { sendButton(config.text) },
@@ -96,7 +101,13 @@ fun CustomButton(
             modifier = Modifier.fillMaxSize()
         ){
             AsyncImage(
-                model = config.imageURL,
+                model = when{
+                    !config.imageURL.startsWith("http") -> File(
+                        LocalContext.current.filesDir,
+                        config.imageURL
+                    )
+                    else -> config.imageURL
+                },
                 contentDescription = "Button Image",
                 modifier = Modifier
                     .fillMaxSize()
@@ -114,14 +125,21 @@ fun CustomButton(
 @Composable
 fun PixelLayout(
     uiConfig: UIConfig,
-    sendButton: (String) -> Unit
+    sendButton: (String) -> Unit,
 ){
-
+    val context = LocalContext.current
+    val bgImageModel = when{
+        !uiConfig.backgroundImage.startsWith("http") -> File(
+            context.filesDir,
+            uiConfig.backgroundImage
+        )
+        else -> uiConfig.backgroundImage
+    }
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ){
         AsyncImage(
-            model = uiConfig.backgroundImage,
+            model = bgImageModel,
             contentDescription = "Background Image",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -130,7 +148,8 @@ fun PixelLayout(
             CustomButton(button,
                 sendButton = sendButton,
                 parentWidth = maxWidth,
-                parentHeight = maxHeight)
+                parentHeight = maxHeight
+            )
         }
         for (image in uiConfig.images){
             AsyncImage(

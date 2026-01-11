@@ -1,5 +1,6 @@
 package com.example.maahBLEController
 
+import FileReceiver
 import android.Manifest
 import android.R
 import android.annotation.SuppressLint
@@ -81,7 +82,7 @@ class MainActivity : ComponentActivity() {
     private var lastSentTilt : Double = 0.0
     private val TILT_THRESHOLD = 0.01
     private var isGattServerSetup = false
-    private val appContext: Context by lazy { applicationContext }
+    private lateinit var appContext: Context
 
     private val bluetoothEnablingResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -100,7 +101,7 @@ class MainActivity : ComponentActivity() {
     lateinit var uiLayout : UIConfig
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
-
+    private lateinit var fileReceiver: FileReceiver
     private fun copyDefaultLayout(){
         val targetFile = File(filesDir,"Test.json")
         assets.open("Test.json").use {
@@ -116,6 +117,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        appContext = applicationContext
+        fileReceiver = FileReceiver(applicationContext)
         copyDefaultLayout()
         uiLayout = loadLayout("Test.json")
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -329,17 +332,18 @@ class MainActivity : ComponentActivity() {
             bluetoothGattServer = null
             isGattServerSetup = false
             bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
+            setupGattServer()
         }
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
-        private val buffer = ByteArrayOutputStream()
+
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             super.onConnectionStateChange(device, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connectedDevice = device
                 Log.i("GATT", "Device connected: ${device.address}")
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+            } else {
                 connectedDevice = null
                 restartGattServer()
                 Log.i("GATT", "Device disconnected: ${device.address}")
@@ -427,27 +431,13 @@ class MainActivity : ComponentActivity() {
                     Log.d("BLE", "Message Received: ${System.currentTimeMillis()}")
                 }
                 layoutCharUUID -> {
-                    val message = String(value!!,Charsets.UTF_8)
-                    when {
-                        message =="START" -> {
-                            buffer.reset()
-                            Log.d("FTP","File transfer started")
+                    val file = fileReceiver.handleMessage(value)
+                    if (file.endsWith(".json")) {
+                        runOnUiThread {
+                            loadLayout(filename = file)
                         }
-                        message.contains("END") -> {
-                            val json = buffer.toByteArray().toString(Charsets.UTF_8)
-                            appContext.openFileOutput("layout.json",Context.MODE_PRIVATE).use{
-                                it.write(json.toByteArray())
-                            }
-                            Log.d("FTP","JSON File received")
-                            runOnUiThread {
-                                uiLayout = loadLayout("layout.json")
-                            }
-
-
-                        }
-                        else -> value.let {buffer.write(it)}
-
                     }
+
                 }
                 else -> {
                     Log.d("BLE", "Write to unknown characteristic")
@@ -583,9 +573,9 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 
 @Composable
 fun AdvertiseScreen(
-    sendPressed: (
-        String) -> Unit,
-        uiLayout: UIConfig) {
+    sendPressed: (String) -> Unit,
+    uiLayout: UIConfig,
+) {
     PixelLayout(uiLayout,sendPressed)
 }
 
