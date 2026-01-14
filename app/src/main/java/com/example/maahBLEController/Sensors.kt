@@ -1,4 +1,4 @@
-package com.example.sensorguide
+package com.example.maahBLEController
 
 import android.content.Context
 import android.content.pm.PackageManager

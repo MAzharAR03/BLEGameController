@@ -1,5 +1,6 @@
 package com.example.maahBLEController
 
+import FileReceiver
 import android.Manifest
 import android.R
 import android.annotation.SuppressLint
@@ -60,10 +61,10 @@ private val phoneIOServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-
 private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
 private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
 private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
-private val messageCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35")
+private val controlCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35")
 private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-private val layoutCharUUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b")
+private val fileTransferCharUUID: UUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b")
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
     private var buttonCharacteristic: BluetoothGattCharacteristic? = null
@@ -81,7 +82,7 @@ class MainActivity : ComponentActivity() {
     private var lastSentTilt : Double = 0.0
     private val TILT_THRESHOLD = 0.01
     private var isGattServerSetup = false
-    private val appContext: Context by lazy { applicationContext }
+    private lateinit var appContext: Context
 
     private val bluetoothEnablingResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -100,7 +101,7 @@ class MainActivity : ComponentActivity() {
     lateinit var uiLayout : UIConfig
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
-
+    private lateinit var fileReceiver: FileReceiver
     private fun copyDefaultLayout(){
         val targetFile = File(filesDir,"Test.json")
         assets.open("Test.json").use {
@@ -116,6 +117,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        appContext = applicationContext
+        fileReceiver = FileReceiver(applicationContext)
         copyDefaultLayout()
         uiLayout = loadLayout("Test.json")
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -149,7 +152,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
     override fun onResume() {
         super.onResume()
         if (!bluetoothAdapter.isEnabled) {
@@ -157,7 +159,9 @@ class MainActivity : ComponentActivity() {
         }
         startAdvertising()
         stepSensor?.startListening()
-        stepSensor?.setOnSensorValuesChangedListener {sendStep()}
+        stepSensor?.setOnSensorValuesChangedListener {
+            writeToChar("Step:", stepCharUUID,confirm = false)
+        }
         accelerometer?.startListening()
         accelerometer?.setOnSensorValuesChangedListener { values ->
             x.value = values[0]
@@ -168,7 +172,7 @@ class MainActivity : ComponentActivity() {
             if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
                 && abs(tilt - lastSentTilt) >= TILT_THRESHOLD)
             {
-                sendTilt(tilt)
+                writeToChar("Tilt:$tilt", tiltCharUUID,confirm = false)
                 lastTiltSpendTime = currentTime
                 lastSentTilt = tilt
             }
@@ -298,13 +302,20 @@ class MainActivity : ComponentActivity() {
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
         messageCharacteristic = BluetoothGattCharacteristic(
-            messageCharUUID,
-            BluetoothGattCharacteristic.PROPERTY_WRITE,
-            BluetoothGattCharacteristic.PERMISSION_WRITE
+            controlCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE or
+                    BluetoothGattCharacteristic.PROPERTY_NOTIFY or
+                    BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_WRITE or
+                    BluetoothGattCharacteristic.PERMISSION_READ
+        )
+        messageCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+            CCCDUUID,
+            BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ)
         )
 
         layoutCharacteristic = BluetoothGattCharacteristic(
-            layoutCharUUID,
+            fileTransferCharUUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE,
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
@@ -329,17 +340,18 @@ class MainActivity : ComponentActivity() {
             bluetoothGattServer = null
             isGattServerSetup = false
             bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
+            setupGattServer()
         }
     }
 
     private val gattServerCallback = object : BluetoothGattServerCallback() {
-        private val buffer = ByteArrayOutputStream()
+
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             super.onConnectionStateChange(device, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connectedDevice = device
                 Log.i("GATT", "Device connected: ${device.address}")
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+            } else {
                 connectedDevice = null
                 restartGattServer()
                 Log.i("GATT", "Device disconnected: ${device.address}")
@@ -352,13 +364,16 @@ class MainActivity : ComponentActivity() {
             offset: Int,
             characteristic: BluetoothGattCharacteristic
         ) {
-            if (characteristic.uuid == buttonCharUuid) {
-                val buttonByte = 1.toByte()// Example value
-                bluetoothGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, byteArrayOf(buttonByte))
-            }
+            val data = characteristic.value
+            bluetoothGattServer?.sendResponse(
+                device,
+                requestId,
+                BluetoothGatt.GATT_SUCCESS,
+                offset,
+                data
+                )
         }
 
-        //Double check and learn this function
         override fun onDescriptorWriteRequest(
             device: BluetoothDevice,
             requestId: Int,
@@ -371,7 +386,6 @@ class MainActivity : ComponentActivity() {
             Log.i("GATT", "onDescriptorWriteRequest: ${descriptor.uuid}")
 
             if (descriptor.uuid == CCCDUUID) {
-                // This is the CCCD (Client Characteristic Configuration Descriptor)
                 if (responseNeeded) {
                     bluetoothGattServer?.sendResponse(
                         device,
@@ -413,6 +427,48 @@ class MainActivity : ComponentActivity() {
                 offset,
                 value
             )
+
+            var status = BluetoothGatt.GATT_SUCCESS
+            try {
+                when(characteristic?.uuid){
+                    controlCharUUID -> {
+                        val message = String(value!!, Charsets.UTF_8)
+                        when{
+                            message.startsWith("START") -> {
+                                fileReceiver.handleStart(message = message)
+                            }
+                            message.startsWith("CHECKSUM") -> {
+                                val receivedChecksum = message.substringAfter(":").toLong()
+                                val acknowledgement = fileReceiver.handleCRC(receivedChecksum = receivedChecksum)
+                                writeToChar(acknowledgement, controlCharUUID,confirm = true)
+                                Log.d("FTP","Notifying: $acknowledgement")
+                            }
+                            message.startsWith("END") -> {
+                                fileReceiver.handleEnd()
+                                if(fileReceiver.isTransferComplete()){
+                                    if(fileReceiver.getFilename().endsWith(".json")){
+                                        runOnUiThread {
+                                            loadLayout(filename = fileReceiver.getFilename())
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                Log.d("FTP","Error processing control message.")
+                            }
+                        }
+                    }
+                    fileTransferCharUUID -> {
+                        fileReceiver.handleFileTransfer(value)
+                    }
+                    else -> {
+                        Log.d("BLE", "Write to unknown characteristic")
+                    }
+                }
+            } catch (e: Exception) {
+                status = BluetoothGatt.GATT_FAILURE
+                Log.d("BLE","Error writing to characteristic: $e")
+            }
             if (responseNeeded) {
                 bluetoothGattServer?.sendResponse(
                     device,
@@ -421,37 +477,6 @@ class MainActivity : ComponentActivity() {
                     offset,
                     value
                 )
-            }
-            when(characteristic?.uuid){
-                messageCharUUID -> {
-                    Log.d("BLE", "Message Received: ${System.currentTimeMillis()}")
-                }
-                layoutCharUUID -> {
-                    val message = String(value!!,Charsets.UTF_8)
-                    when {
-                        message.startsWith("START") -> {
-                            buffer.reset()
-                            Log.d("FTP","File transfer started")
-                        }
-                        message.contains("END") -> {
-                            val json = buffer.toByteArray().toString(Charsets.UTF_8)
-                            appContext.openFileOutput("layout.json",Context.MODE_PRIVATE).use{
-                                it.write(json.toByteArray())
-                            }
-                            Log.d("FTP","JSON File received")
-                            runOnUiThread {
-                                uiLayout = loadLayout("layout.json")
-                            }
-
-
-                        }
-                        else -> value.let {buffer.write(it)}
-
-                    }
-                }
-                else -> {
-                    Log.d("BLE", "Write to unknown characteristic")
-                }
             }
         }
     }
@@ -495,51 +520,38 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sendPressed(text: String){
+
+    private fun writeToChar(text: String, uuid: UUID, confirm: Boolean){
+        val data = text.toByteArray()
+        val characteristic = when(uuid){
+            buttonCharUuid -> buttonCharacteristic
+            tiltCharUUID -> tiltCharacteristic
+            stepCharUUID -> stepCharacteristic
+            controlCharUUID -> messageCharacteristic
+            else -> null
+        }
         connectedDevice?.let {device ->
-            buttonCharacteristic?.value = "Button: $text".toByteArray()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
-                    buttonCharacteristic!!,
-                    false,
-                    buttonCharacteristic!!.value
+                    characteristic!!,
+                    confirm,
+                    data
                 )
             } else {
+                buttonCharacteristic?.value = data
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
-                    buttonCharacteristic,
+                    characteristic,
                     false
                 )
             }
-        } //?: Log.w("BLE", "No device connected")
-
-    }
-    private fun sendStep(){
-        connectedDevice?.let {device ->
-            stepCharacteristic?.value = "Step:".toByteArray()
-            bluetoothGattServer?.notifyCharacteristicChanged(
-                device,
-                stepCharacteristic,
-                false
-            )
-        } //?: Log.w("BLE", "No device connected")
-
+        }
     }
 
-    private fun sendTilt(tilt: Double){
-        connectedDevice?.let {device ->
-            val string = "Tilt: $tilt"
-            tiltCharacteristic?.value = string.toByteArray()
-            bluetoothGattServer?.notifyCharacteristicChanged(
-                device,
-                tiltCharacteristic,
-                false
-            )
-        } //?: Log.w("BLE", "No device connected")
-
+    private fun sendPressed(text:String){
+        writeToChar(text = text, uuid = buttonCharUuid,confirm = false)
     }
-
     fun hideSystemUI(){
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
             val controller = WindowInsetsControllerCompat(window,window.decorView)
@@ -583,9 +595,9 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 
 @Composable
 fun AdvertiseScreen(
-    sendPressed: (
-        String) -> Unit,
-        uiLayout: UIConfig) {
+    sendPressed: (String) -> Unit,
+    uiLayout: UIConfig,
+) {
     PixelLayout(uiLayout,sendPressed)
 }
 

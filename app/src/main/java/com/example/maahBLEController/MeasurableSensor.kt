@@ -1,4 +1,4 @@
-package com.example.sensorguide
+package com.example.maahBLEController
 //following Tutorial:https://www.youtube.com/watch?v=IU-EAtITRRM
 abstract class MeasurableSensor (
     protected val sensorType: Int
