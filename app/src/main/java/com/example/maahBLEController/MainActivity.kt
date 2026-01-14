@@ -41,10 +41,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
-import com.example.sensorguide.Accelerometer
-import com.example.sensorguide.MeasurableSensor
-import com.example.sensorguide.StepDetector
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.lang.System
 
