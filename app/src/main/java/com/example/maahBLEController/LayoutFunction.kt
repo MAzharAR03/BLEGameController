@@ -66,9 +66,9 @@ data class ImageConfig(
 ) : ElementConfig
 
 data class UIConfig(
-    var buttons: List<ButtonConfig>,
-    var images: List<ImageConfig>,
-    var backgroundImage: String
+    val buttons: List<ButtonConfig>,
+    val images: List<ImageConfig>,
+    val backgroundImage: String
 )
 
 //make reusable AsyncImage clas
@@ -83,7 +83,6 @@ fun CustomButton(
     Button(
         onClick = { sendButton(config.text) },
         shape = config.shape,
-        //colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
         colors = ButtonDefaults.buttonColors(
             containerColor = when(config.color){
                 "transparent" -> Color.Transparent

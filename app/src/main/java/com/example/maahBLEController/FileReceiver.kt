@@ -1,8 +1,8 @@
+package com.example.maahBLEController
 
 import android.content.Context
 import android.util.Log
 import java.io.ByteArrayOutputStream
-import java.util.Random
 import java.util.zip.CRC32
 const val DEBUG = true
 class FileReceiver(

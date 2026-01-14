@@ -1,6 +1,4 @@
 package com.example.maahBLEController
-
-import FileReceiver
 import android.Manifest
 import android.R
 import android.annotation.SuppressLint
@@ -34,6 +32,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
@@ -83,32 +82,31 @@ class MainActivity : ComponentActivity() {
     private val bluetoothEnablingResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ){
-            result ->
+        result ->
         if(result.resultCode == RESULT_OK){
-
         } else{
             promptEnableBluetooth()
         }
     }
 
-    var x = mutableStateOf(0f)
-    var y = mutableStateOf(0f)
-    var z = mutableStateOf(0f)
-    lateinit var uiLayout : UIConfig
+    var x = mutableFloatStateOf(0f)
+    var y = mutableFloatStateOf(0f)
+    var z = mutableFloatStateOf(0f)
+    var uiLayout by mutableStateOf(UIConfig(emptyList(),emptyList(),""))
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
     private lateinit var fileReceiver: FileReceiver
     private fun copyDefaultLayout(){
-        val targetFile = File(filesDir,"Test.json")
-        assets.open("Test.json").use {
+        val targetFile = File(filesDir,"DefaultLayout.json")
+        assets.open("DefaultLayout.json").use {
             input -> targetFile.outputStream().use {
                 output -> input.copyTo(output)
         }
         }
     }
 
-    private fun loadLayout(filename: String): UIConfig{
-        return LayoutParser(filename,this).apply {readJSON()}.uiConfig
+    private fun loadLayout(filename: String){
+        uiLayout = LayoutParser(filename,this).apply {readJSON()}.getNewUI()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -116,7 +114,7 @@ class MainActivity : ComponentActivity() {
         appContext = applicationContext
         fileReceiver = FileReceiver(applicationContext)
         copyDefaultLayout()
-        uiLayout = loadLayout("Test.json")
+        loadLayout("DefaultLayout.json")
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
@@ -546,7 +544,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendPressed(text:String){
-        writeToChar(text = text, uuid = buttonCharUuid,confirm = false)
+        writeToChar(text = "Button:$text", uuid = buttonCharUuid,confirm = false)
     }
     fun hideSystemUI(){
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){

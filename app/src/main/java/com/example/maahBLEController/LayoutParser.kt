@@ -15,9 +15,16 @@ class LayoutParser(
     val fileName: String,
     val context: Context
 ) {
-    val buttonList = mutableListOf<ButtonConfig>()
-    val imageList = mutableListOf<ImageConfig>()
-    lateinit var uiConfig: UIConfig
+    var buttonList: List<ButtonConfig> = listOf()
+    var imageList: List<ImageConfig> = listOf()
+    var backgroundImage: String = ""
+    fun getNewUI(): UIConfig{
+        return UIConfig(
+            buttons = buttonList,
+            images = imageList,
+            backgroundImage = backgroundImage
+        )
+    }
     fun readJSON() {
         val jsonString = try {
             val file = File(context.filesDir, fileName)
@@ -32,7 +39,7 @@ class LayoutParser(
             throw e
         }
         val root = JSONObject(jsonString)
-        val backgroundImage = root.getString("background image")
+        backgroundImage = root.getString("background image")
         val buttons = if(root.has("buttons")){
             root.getJSONArray("buttons")
         } else {
@@ -40,7 +47,7 @@ class LayoutParser(
         }
         for (i in 0..<buttons.length()) {
             val cell = buttons.getJSONObject(i)
-            buttonList.add(
+            buttonList = buttonList +
                 ButtonConfig(
                     text = cell.getString("text"),
                     textColor = cell.getString("textColor"),
@@ -59,7 +66,6 @@ class LayoutParser(
                     imageURL = cell.getString("imageURL"),
                     padding = cell.getInt("padding")
                 )
-            )
         }
         val images = if(root.has("images")){
             root.getJSONArray("images")
@@ -68,7 +74,7 @@ class LayoutParser(
         }
         for (i  in 0..<images.length()){
             val cell = images.getJSONObject(i)
-            imageList.add(
+            imageList = imageList +
                 ImageConfig(
                     imageURL = cell.getString("imageURL"),
                     width = cell.getInt("width"),
@@ -85,13 +91,7 @@ class LayoutParser(
                         else -> ContentScale.None
                     }
                 )
-            )
         }
-        uiConfig = UIConfig(
-            backgroundImage = backgroundImage,
-            buttons = buttonList,
-            images = imageList
-        )
     }
 
 
