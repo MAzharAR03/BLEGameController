@@ -16,12 +16,5 @@
     }
   ],
   "images": [
-    {
-      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/Larian_Studios_Logo_2012.png",
-      "width": 100,
-      "height": 100,
-      "xOffset": 0.8,
-      "yOffset": 0.15
-    }
   ]
 }
