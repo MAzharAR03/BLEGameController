@@ -40,7 +40,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
-import java.io.File
 import java.lang.System
 
 
@@ -83,8 +82,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ){
         result ->
-        if(result.resultCode == RESULT_OK){
-        } else{
+        if(result.resultCode != RESULT_OK){
             promptEnableBluetooth()
         }
     }
@@ -96,14 +94,14 @@ class MainActivity : ComponentActivity() {
     var stepSensor: MeasurableSensor? = null
     var accelerometer: MeasurableSensor? = null
     private lateinit var fileReceiver: FileReceiver
-    private fun copyDefaultLayout(){
-        val targetFile = File(filesDir,"DefaultLayout.json")
-        assets.open("DefaultLayout.json").use {
-            input -> targetFile.outputStream().use {
-                output -> input.copyTo(output)
-        }
-        }
-    }
+//    private fun copyDefaultLayout(){
+//        val targetFile = File(filesDir,"DefaultLayout.json")
+//        assets.open("DefaultLayout.json").use {
+//            input -> targetFile.outputStream().use {
+//                output -> input.copyTo(output)
+//        }
+//        }
+//    }
 
     private fun loadLayout(filename: String){
         uiLayout = LayoutParser(filename,this).apply {readJSON()}.getNewUI()
@@ -113,13 +111,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         appContext = applicationContext
         fileReceiver = FileReceiver(applicationContext)
-        copyDefaultLayout()
         loadLayout("DefaultLayout.json")
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
         }
+
         //for android 10 and below - BLE requires location perms
+        //combine with BLE perms later
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED
@@ -131,8 +130,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        stepSensor = StepDetector(this,"FASTEST")
-        accelerometer = Accelerometer(this,"GAME")
+        stepSensor = StepDetector(this,SensorDelay.FASTEST)
+        accelerometer = Accelerometer(this, SensorDelay.GAME)
         bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         startAdvertising()

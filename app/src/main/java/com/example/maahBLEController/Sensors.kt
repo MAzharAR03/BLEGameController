@@ -6,7 +6,7 @@ import android.hardware.Sensor
 
 class RotationVectorSensor(
     context: Context,
-    sensorDelay: String
+    sensorDelay: SensorDelay
 ): AndroidSensor(
     context = context,
     sensorFeature = "android.hardware.SensorManager.sensor.rotation_vector",
@@ -16,7 +16,7 @@ class RotationVectorSensor(
 
 class StepDetector(
     context: Context,
-    sensorDelay: String
+    sensorDelay: SensorDelay
 ): AndroidSensor(
     context = context,
     sensorFeature = PackageManager.FEATURE_SENSOR_STEP_DETECTOR,
@@ -26,7 +26,7 @@ class StepDetector(
 
 class Accelerometer(
     context: Context,
-    sensorDelay: String
+    sensorDelay: SensorDelay
 ): AndroidSensor(
     context = context,
     sensorFeature = PackageManager.FEATURE_SENSOR_ACCELEROMETER,

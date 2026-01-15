@@ -6,11 +6,17 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 
+enum class SensorDelay{
+    UI,
+    GAME,
+    FASTEST,
+    NORMAL
+}
 abstract class AndroidSensor(
     private val context: Context,
     private val sensorFeature: String,
     sensorType: Int,
-    val sensorDelay: String
+    val sensorDelay: SensorDelay
 ): MeasurableSensor(sensorType), SensorEventListener{
 
     override val doesSensorExist: Boolean
@@ -29,9 +35,9 @@ abstract class AndroidSensor(
         }
         sensor?.let{
             when(sensorDelay){
-                "UI" -> sensorManager.registerListener(this,it,SensorManager.SENSOR_DELAY_UI)
-                "GAME" -> sensorManager.registerListener(this,it,SensorManager.SENSOR_DELAY_GAME)
-                "FASTEST" -> sensorManager.registerListener(this,it, SensorManager.SENSOR_DELAY_FASTEST)
+                SensorDelay.UI -> sensorManager.registerListener(this,it,SensorManager.SENSOR_DELAY_UI)
+                SensorDelay.GAME -> sensorManager.registerListener(this,it,SensorManager.SENSOR_DELAY_GAME)
+                SensorDelay.FASTEST -> sensorManager.registerListener(this,it, SensorManager.SENSOR_DELAY_FASTEST)
                 else -> sensorManager.registerListener(this,it, SensorManager.SENSOR_DELAY_NORMAL)
             }
         }
