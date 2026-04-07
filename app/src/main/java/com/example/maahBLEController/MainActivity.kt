@@ -40,6 +40,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
 import java.lang.System
 
@@ -72,6 +73,14 @@ class MainActivity : ComponentActivity() {
     private var bluetoothGattServer: BluetoothGattServer? = null
     private var connectedDevice: BluetoothDevice? = null
 
+    private val inputManager by lazy {
+        InputManager (
+            context = this,
+            scope = this.lifecycleScope,
+            onReport = {
+                jsonString -> writeToChar(jsonString, buttonCharUuid, confirm = false) }
+    )
+}
     private val TILT_UPDATE_INTERVAL_MS = 0L
     private var lastTiltSpendTime = 0L
     private var lastSentTilt : Double = 0.0
@@ -87,13 +96,11 @@ class MainActivity : ComponentActivity() {
             promptEnableBluetooth()
         }
     }
-
-    var x = mutableFloatStateOf(0f)
-    var y = mutableFloatStateOf(0f)
-    var z = mutableFloatStateOf(0f)
-    var uiLayout by mutableStateOf(UIConfig(emptyList(),emptyList(),""))
-    var stepSensor: MeasurableSensor? = null
-    var accelerometer: MeasurableSensor? = null
+    var uiLayout by mutableStateOf(
+        UIConfig(
+            emptyList(),
+            emptyList(),
+            ""))
     private lateinit var fileReceiver: FileReceiver
 //    private fun copyDefaultLayout(){
 //        val targetFile = File(filesDir,"DefaultLayout.json")
@@ -106,6 +113,7 @@ class MainActivity : ComponentActivity() {
 
     private fun loadLayout(filename: String){
         uiLayout = LayoutParser(filename,this).apply {readJSON()}.getNewUI()
+        inputManager.setButtons(uiLayout.buttons)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,9 +138,8 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        inputManager.startReportingLoop()
 
-        stepSensor = StepDetector(this,SensorDelay.FASTEST)
-        accelerometer = Accelerometer(this, SensorDelay.GAME)
         bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         startAdvertising()
@@ -140,8 +147,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             BLEAdvertiseTheme {
                 AdvertiseScreen(
-                    sendPressed = ::sendPressed,
-                    uiLayout
+                    uiLayout = uiLayout,
+                    onButtonStateChanged = {
+                        name, isPressed -> inputManager.updateButtonState(name, isPressed)
+                    }
+
                 )
             }
         }
@@ -152,32 +162,10 @@ class MainActivity : ComponentActivity() {
             promptEnableBluetooth()
         }
         startAdvertising()
-        stepSensor?.startListening()
-        stepSensor?.setOnSensorValuesChangedListener {
-            writeToChar("Step:", stepCharUUID,confirm = false)
-        }
-        accelerometer?.startListening()
-        accelerometer?.setOnSensorValuesChangedListener { values ->
-            x.value = values[0]
-            y.value = values[1]
-            z.value = values[2]
-            val tilt = calculatePitch(x.value,y.value,z.value)
-            val currentTime = System.currentTimeMillis()
-            if(currentTime - lastTiltSpendTime >= TILT_UPDATE_INTERVAL_MS
-                && abs(tilt - lastSentTilt) >= TILT_THRESHOLD)
-            {
-                writeToChar("Tilt:$tilt", tiltCharUUID,confirm = false)
-                lastTiltSpendTime = currentTime
-                lastSentTilt = tilt
-            }
-        }
+        inputManager.setupSensors()
+        inputManager.startListening()
+
     }
-
-
-    private fun calculatePitch(x: Float, y: Float, z: Float): Double {
-        return  atan2(-y.toDouble(), sqrt(x * x + z * z).toDouble())
-    }
-
     private fun Activity.requestRelevantRuntimePermissions() {
         if(hasRequiredBluetoothPermissions()) {return}
         when{
@@ -514,7 +502,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
+// Input / BLE
     private fun writeToChar(text: String, uuid: UUID, confirm: Boolean){
         val data = text.toByteArray()
         val characteristic = when(uuid){
@@ -543,9 +531,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sendPressed(text:String){
-        writeToChar(text = "Button:$text", uuid = buttonCharUuid,confirm = false)
-    }
     fun hideSystemUI(){
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
             val controller = WindowInsetsControllerCompat(window,window.decorView)
@@ -589,10 +574,10 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 
 @Composable
 fun AdvertiseScreen(
-    sendPressed: (String) -> Unit,
+    onButtonStateChanged: (String, Boolean) -> Unit,
     uiLayout: UIConfig,
 ) {
-    PixelLayout(uiLayout,sendPressed)
+    PixelLayout(uiLayout,onButtonStateChanged)
 }
 
 //@Preview(

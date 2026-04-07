@@ -33,3 +33,23 @@ class Accelerometer(
     sensorType = Sensor.TYPE_ACCELEROMETER,
     sensorDelay = sensorDelay
 )
+
+class LinearAccelerometer(
+    context: Context,
+    sensorDelay: SensorDelay
+): AndroidSensor(
+    context = context,
+    sensorFeature = PackageManager.FEATURE_SENSOR_ACCELEROMETER,
+    sensorType = Sensor.TYPE_LINEAR_ACCELERATION,
+    sensorDelay = sensorDelay
+)
+
+class Gravity(
+    context: Context,
+    sensorDelay: SensorDelay
+): AndroidSensor(
+    context = context,
+    sensorFeature = PackageManager.FEATURE_SENSOR_ACCELEROMETER,
+    sensorType = Sensor.TYPE_GRAVITY,
+    sensorDelay = sensorDelay
+)

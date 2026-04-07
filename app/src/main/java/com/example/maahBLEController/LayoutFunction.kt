@@ -1,8 +1,7 @@
 package com.example.maahBLEController
 
 import android.annotation.SuppressLint
-import android.content.Context
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,10 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import coil3.size.Size
-
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.padding
 
 /*
 transfer file over BLE
@@ -77,23 +76,37 @@ data class UIConfig(
 
 //make reusable AsyncImage clas
 
+fun Modifier.onPressRelease(
+    onPress: () -> Unit,
+    onRelease: () -> Unit
+): Modifier = this.pointerInput(Unit) {
+    awaitPointerEventScope{
+        while(true){
+            awaitFirstDown()
+            onPress()
+            waitForUpOrCancellation()
+            onRelease()
+        }
+    }
+}
+
 @Composable
 fun CustomButton(
     config: ButtonConfig,
-    sendButton: (String) -> Unit,
+    onButtonStateChanged: (String, Boolean) -> Unit,
     parentHeight: Dp,
     parentWidth: Dp,
 ) {
-    Button(
-        onClick = { sendButton(config.text) },
-        shape = config.shape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = when(config.color){
-                "transparent" -> Color.Transparent
-                else -> Color(android.graphics.Color.parseColor(config.color))
-            }),
-        contentPadding = PaddingValues(config.padding.dp), //add padding to json
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .clip(config.shape)
+            .background(
+                when (config.color) {
+                    "transparent" -> Color.Transparent
+                    else -> Color(android.graphics.Color.parseColor(config.color))
+                }
+            )
             .size(
                 width = config.width.dp,
                 height = config.height.dp
@@ -102,38 +115,38 @@ fun CustomButton(
                 //to offset the button relative to center rather than top left
                 x = parentWidth * config.xOffsetRel - config.width.dp/2,
                 y = parentHeight * config.yOffsetRel - config.width.dp/2)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize()
-        ){
-            AsyncImage(
-                model = when{
-                    !config.imageURL.startsWith("http") -> File(
-                        LocalContext.current.filesDir,
-                        config.imageURL
-                    )
-                    else -> config.imageURL
-                },
-                contentDescription = "Button Image",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(config.shape)
+            .onPressRelease(
+                onPress = { onButtonStateChanged (config.text, true) },
+                onRelease = { onButtonStateChanged (config.text, false)}
             )
-            Text(
-                text = config.text,
-                fontSize = config.fontSize.sp,
-                color = Color(android.graphics.Color.parseColor(config.textColor)))
-        }
-
+            .padding(config.padding.dp)
+) {
+        AsyncImage(
+            model = when{
+                !config.imageURL.startsWith("http") -> File(
+                    LocalContext.current.filesDir,
+                    config.imageURL
+                )
+                else -> config.imageURL
+            },
+            contentDescription = "Button Image",
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(config.shape)
+        )
+        Text(
+            text = config.text,
+            fontSize = config.fontSize.sp,
+            color = Color(android.graphics.Color.parseColor(config.textColor)))
     }
+
 }
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun PixelLayout(
     uiConfig: UIConfig,
-    sendButton: (String) -> Unit,
+    onButtonStateChanged: (String, Boolean) -> Unit,
 ){
     val context = LocalContext.current
     val bgImageModel = when{
@@ -153,10 +166,11 @@ fun PixelLayout(
             contentScale = ContentScale.Crop
         )
         for (button in uiConfig.buttons){
-            CustomButton(button,
-                sendButton = sendButton,
-                parentWidth = maxWidth,
-                parentHeight = maxHeight
+            CustomButton(
+                config = button,
+                onButtonStateChanged = onButtonStateChanged,
+                parentHeight = maxHeight,
+                parentWidth = maxWidth
             )
         }
         for (image in uiConfig.images){
