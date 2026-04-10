@@ -1,6 +1,5 @@
 package com.example.maahBLEController
 
-import ManualStepDetector
 import android.content.Context
 import android.util.Log
 import kotlin.math.atan2
@@ -12,7 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlin.collections.containsKey
+
 
 //need the custom button from Claude
 // InputManager needs to be in UI - when button is pressed/released buttonState is released
@@ -55,11 +54,16 @@ class InputManager(
         }
     }
     private var currentPitch = 0.0
+    private var currentRoll = 0.0
     private var currentGravity: List<Float> = listOf(0f,0f,0f)
     private var currentLinearAccel = listOf(0f,0f,0f)
 
     private fun calculatePitch(x: Float, y: Float, z: Float): Double {
         return atan2(-y.toDouble(), sqrt(x * x + z * z).toDouble())
+    }
+
+    private fun calculateRoll(x: Float, y: Float, z: Float): Double {
+        return atan2(z.toDouble(), x.toDouble())
     }
 
     fun updateButtonState(buttonText: String, isPressed: Boolean){
@@ -113,6 +117,7 @@ class InputManager(
     public fun setupSensors(){
         accelerometer.setOnSensorValuesChangedListener { values ->
             currentPitch = calculatePitch(values[0], values[1], values[2])
+            currentRoll = calculateRoll(values[0], values[1], values[2])
         }
         linearAccelerometer.setOnSensorValuesChangedListener { values ->
             currentLinearAccel = values

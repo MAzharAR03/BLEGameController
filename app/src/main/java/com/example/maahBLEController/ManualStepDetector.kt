@@ -1,15 +1,14 @@
+package com.example.maahBLEController
+
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import com.example.maahBLEController.LinearAccelerometer
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-//This class was inspired by https://github.com/isibord/StepTrackerAndroid.git
-
 class ManualStepDetector(
     linearAccelerometer: LinearAccelerometer,
-    gravity: com.example.maahBLEController.Gravity
+    gravity: Gravity
 ) {
     // minimum threshold for Linear Acceleration to pass to count as a step. Filters out noise like small bumps
     private val NOISE_THRESHOLD = 1.0

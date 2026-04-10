@@ -100,7 +100,6 @@ fun CustomButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(config.shape)
             .background(
                 when (config.color) {
                     "transparent" -> Color.Transparent
@@ -114,33 +113,36 @@ fun CustomButton(
             .offset(
                 //to offset the button relative to center rather than top left
                 x = parentWidth * config.xOffsetRel - config.width.dp/2,
-                y = parentHeight * config.yOffsetRel - config.width.dp/2)
+                y = parentHeight * config.yOffsetRel - config.height.dp/2)
             .onPressRelease(
                 onPress = { onButtonStateChanged (config.text, true) },
                 onRelease = { onButtonStateChanged (config.text, false)}
             )
             .padding(config.padding.dp)
+            .clip(config.shape)
 ) {
-        AsyncImage(
-            model = when{
-                !config.imageURL.startsWith("http") -> File(
-                    LocalContext.current.filesDir,
-                    config.imageURL
-                )
-                else -> config.imageURL
-            },
-            contentDescription = "Button Image",
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(config.shape)
-        )
-        Text(
-            text = config.text,
-            fontSize = config.fontSize.sp,
-            color = Color(android.graphics.Color.parseColor(config.textColor)))
+            AsyncImage(
+                model = when {
+                    !config.imageURL.startsWith("http") -> File(
+                        LocalContext.current.filesDir,
+                        config.imageURL
+                    )
+
+                    else -> config.imageURL
+                },
+                contentDescription = "Button Image",
+                modifier = Modifier
+                    .fillMaxSize()
+                    //.clip(config.shape)
+            )
+            Text(
+                text = config.text,
+                fontSize = config.fontSize.sp,
+                color = Color(android.graphics.Color.parseColor(config.textColor))
+            )
+        }
     }
 
-}
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable

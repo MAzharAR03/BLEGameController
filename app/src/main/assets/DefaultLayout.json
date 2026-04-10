@@ -2,13 +2,55 @@
   "background image":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/bg3 bg.webp",
   "buttons": [
     {
-      "text":"FIRE",
+      "text":"Y",
       "textColor": "#C8A2C8",
-      "textFontSize": 10,
-      "width": 100,
-      "height":100,
-      "xOffset":0.2,
-      "yOffset":0.15,
+      "textFontSize": 16,
+      "width": 70,
+      "height":70,
+      "xOffset":0.8,
+      "yOffset":0.3,
+      "shape": "circle",
+      "color": "transparent",
+      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/fire.png",
+      "rounding":14,
+      "padding":0
+    },
+    {
+      "text":"A",
+      "textColor": "#C8A2C8",
+      "textFontSize": 16,
+      "width": 70,
+      "height":70,
+      "xOffset":0.8,
+      "yOffset":0.7,
+      "shape": "circle",
+      "color": "transparent",
+      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/fire.png",
+      "rounding":14,
+      "padding":0
+    },
+    {
+      "text":"B",
+      "textColor": "#C8A2C8",
+      "textFontSize": 16,
+      "width": 70,
+      "height":70,
+      "xOffset":0.9,
+      "yOffset":0.5,
+      "shape": "circle",
+      "color": "transparent",
+      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/fire.png",
+      "rounding":14,
+      "padding":0
+    },
+    {
+      "text":"X",
+      "textColor": "#C8A2C8",
+      "textFontSize": 16,
+      "width": 70,
+      "height":70,
+      "xOffset":0.7,
+      "yOffset":0.5,
       "shape": "circle",
       "color": "transparent",
       "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/fire.png",
@@ -17,13 +59,5 @@
     }
   ],
   "images": [
-    {
-      "imageURL":"https://raw.githubusercontent.com/MAzharAR03/BLEGameController/master/images/Larian_Studios_Logo_2012.png",
-      "width": 100,
-      "height": 100,
-      "xOffset": 0.8,
-      "yOffset": 0.15,
-      "contentScale": "Fit"
-    }
   ]
 }
