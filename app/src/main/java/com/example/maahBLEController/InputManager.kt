@@ -90,7 +90,7 @@ class InputManager(
                         buttonArray.put(buttonObj)
                     }
                     controllerState.put("buttons", buttonArray)
-                    onReport(controllerState.toString())
+                    sendChunked(controllerState.toString())
                 } catch (e: Exception){
                     Log.e("InputManager", "JSON Error: ${e.message}")
                     e.printStackTrace()
@@ -99,6 +99,27 @@ class InputManager(
             }
             Log.d("InputManager","Reporting loop finished")
 
+        }
+    }
+
+    private val CHUNK_SIZE = 400
+
+    private fun sendChunked(json: String){
+        val bytes = json.toByteArray()
+        if (bytes.size <= CHUNK_SIZE){
+            onReport(json)
+            return
+        }
+
+        val chunks = bytes.toList().chunked(CHUNK_SIZE)
+        val total = chunks.size
+        chunks.forEachIndexed { index, chunk ->
+            val prefix = when {
+                index == 0 -> "START: $total:"
+                index == total - 1 -> "END:"
+                else -> "CHUNK:$index:"
+            }
+            onReport(prefix + String(chunk.toByteArray()))
         }
     }
 
@@ -114,7 +135,7 @@ class InputManager(
         gravity.stopListening()
     }
 
-    public fun setupSensors(){
+    fun setupSensors(){
         accelerometer.setOnSensorValuesChangedListener { values ->
             currentPitch = calculatePitch(values[0], values[1], values[2])
             currentRoll = calculateRoll(values[0], values[1], values[2])

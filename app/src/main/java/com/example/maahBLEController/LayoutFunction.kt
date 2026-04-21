@@ -27,7 +27,15 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.coerceAtMost
 
 /*
 transfer file over BLE
@@ -39,16 +47,16 @@ allow contentScale option ?
 * */
 
 interface ElementConfig{
-    val width: Int
-    val height: Int
+    val width: Float
+    val height: Float
     val xOffsetRel: Float
     val yOffsetRel: Float
 }
 data class ButtonConfig (
     val text: String,
     val fontSize: Int,
-    override val width: Int,
-    override val height: Int,
+    override val width: Float,
+    override val height: Float,
     override val xOffsetRel: Float,
     override val yOffsetRel: Float,
     val shape: Shape,
@@ -60,8 +68,8 @@ data class ButtonConfig (
 
 
 data class ImageConfig(
-    override val width: Int,
-    override val height: Int,
+    override val width: Float,
+    override val height: Float,
     override val xOffsetRel: Float,
     override val yOffsetRel: Float,
     val imageURL: String,
@@ -78,13 +86,17 @@ data class UIConfig(
 
 fun Modifier.onPressRelease(
     onPress: () -> Unit,
-    onRelease: () -> Unit
+    onRelease: () -> Unit,
+    interactionSource: MutableInteractionSource
 ): Modifier = this.pointerInput(Unit) {
     awaitPointerEventScope{
         while(true){
             awaitFirstDown()
+            val press = PressInteraction.Press(Offset.Zero)
+            interactionSource.tryEmit(press)
             onPress()
             waitForUpOrCancellation()
+            interactionSource.tryEmit(PressInteraction.Release(press))
             onRelease()
         }
     }
@@ -97,29 +109,37 @@ fun CustomButton(
     parentHeight: Dp,
     parentWidth: Dp,
 ) {
+
+    val interactionSource = remember { MutableInteractionSource() } // For button ripple affect
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
+            .size(
+                width = parentWidth * config.width,
+                height = parentHeight * config.height
+            )
+            .offset(
+//                to offset the button relative to center rather than top left
+//                x = parentWidth * config.xOffsetRel - config.width.dp/2,
+//                y = parentHeight * config.yOffsetRel - config.height.dp/2
+                x = (parentWidth * config.xOffsetRel).coerceAtMost(parentWidth - parentWidth * config.width),
+                y = (parentHeight * config.yOffsetRel).coerceAtMost( parentHeight - parentHeight * config.height)
+            )
+            .clip(config.shape)
             .background(
                 when (config.color) {
                     "transparent" -> Color.Transparent
                     else -> Color(android.graphics.Color.parseColor(config.color))
                 }
             )
-            .size(
-                width = config.width.dp,
-                height = config.height.dp
-            )
-            .offset(
-                //to offset the button relative to center rather than top left
-                x = parentWidth * config.xOffsetRel - config.width.dp/2,
-                y = parentHeight * config.yOffsetRel - config.height.dp/2)
+            .indication(interactionSource, ripple())
             .onPressRelease(
                 onPress = { onButtonStateChanged (config.text, true) },
-                onRelease = { onButtonStateChanged (config.text, false)}
+                onRelease = { onButtonStateChanged (config.text, false)},
+                interactionSource = interactionSource
             )
             .padding(config.padding.dp)
-            .clip(config.shape)
+
 ) {
             AsyncImage(
                 model = when {
@@ -186,8 +206,8 @@ fun PixelLayout(
                         height = image.height.dp
                     )
                     .offset(
-                        x = maxWidth * image.xOffsetRel - image.width.dp/2,
-                        y = maxHeight * image.yOffsetRel - image.width.dp/2)
+                        x = maxWidth * image.xOffsetRel,
+                        y = maxHeight * image.yOffsetRel)
                     )
         }
     }

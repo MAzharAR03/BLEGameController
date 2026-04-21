@@ -52,8 +52,8 @@ class LayoutParser(
                     text = cell.getString("text"),
                     textColor = cell.getString("textColor"),
                     fontSize = cell.getInt("textFontSize"),
-                    width = cell.getInt("width"),
-                    height = cell.getInt("height"),
+                    width = cell.getDouble("width").toFloat(),
+                    height = cell.getDouble("height").toFloat(),
                     xOffsetRel = cell.getDouble("xOffset").toFloat(),
                     yOffsetRel = cell.getDouble("yOffset").toFloat(),
                     shape = when (cell.getString("shape")) {
@@ -77,8 +77,8 @@ class LayoutParser(
             imageList = imageList +
                 ImageConfig(
                     imageURL = cell.getString("imageURL"),
-                    width = cell.getInt("width"),
-                    height = cell.getInt("height"),
+                    width = cell.getDouble("width").toFloat(),
+                    height = cell.getDouble("height").toFloat(),
                     xOffsetRel = cell.getDouble("xOffset").toFloat(),
                     yOffsetRel = cell.getDouble("yOffset").toFloat(),
                     contentScale = when(cell.getString("contentScale")){
