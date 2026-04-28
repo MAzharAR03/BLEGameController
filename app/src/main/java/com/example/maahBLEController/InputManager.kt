@@ -40,7 +40,7 @@ class InputManager(
 
 
     private var reportingJob: Job? = null
-    private val REPORTING_INTERVAL_MS = 100L
+    private val REPORTING_INTERVAL_MS = 50L
 
     private lateinit var buttons : List<ButtonConfig>
 

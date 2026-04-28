@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "635129840533",
+    "project_id": "maah-bluetooth-game-controller",
+    "storage_bucket": "maah-bluetooth-game-controller.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635129840533:android:a7e7d8b2a5dec8d55cac9c",
+        "android_client_info": {
+          "package_name": "com.example.maahBLEController"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBz0sT606jJ0GYDZI1LaLPpXmpJcDKC3vc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
