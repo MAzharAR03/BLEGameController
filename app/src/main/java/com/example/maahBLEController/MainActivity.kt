@@ -19,6 +19,7 @@ import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -27,20 +28,27 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.activity
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
 import java.lang.System
 
@@ -120,7 +128,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         appContext = applicationContext
         fileReceiver = FileReceiver(applicationContext)
-        loadLayout("DefaultLayout.json")
+
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1)
@@ -146,13 +154,45 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BLEAdvertiseTheme {
-                AdvertiseScreen(
-                    uiLayout = uiLayout,
-                    onButtonStateChanged = {
-                        name, isPressed -> inputManager.updateButtonState(name, isPressed)
+                val navController = rememberNavController()
+                NavHost(navController = navController, startDestination = "home"){
+                    composable("home"){
+                        HomeScreen(
+                            context = appContext,
+                            onLayoutSelected = {
+                                filename -> loadLayout(filename)
+                                navController.navigate("controller")
+                            }
+                        )
                     }
 
-                )
+                    composable("controller"){
+                        val activity = LocalContext.current as Activity
+
+                        DisposableEffect(Unit){
+                            val originalOrientation = activity.requestedOrientation
+                            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+                            onDispose {
+                                activity.requestedOrientation = originalOrientation
+                                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            }
+                        }
+                        AdvertiseScreen(
+                            uiLayout = uiLayout,
+                            onButtonStateChanged = {
+                                name, isPressed -> inputManager.updateButtonState(name, isPressed)
+                            }
+                        )
+
+                        BackHandler() {
+                            navController.popBackStack()
+                        }
+                    }
+
+                }
+
             }
         }
     }

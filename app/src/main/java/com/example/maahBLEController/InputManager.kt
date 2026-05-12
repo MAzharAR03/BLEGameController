@@ -47,6 +47,7 @@ class InputManager(
     private val buttonStates = mutableMapOf<String, Boolean>()
     fun setButtons(buttons: List<ButtonConfig>) {
         this.buttons = buttons
+        buttonStates.clear()
         buttons.forEach { button ->
             if (!buttonStates.containsKey(button.text)) {
                 buttonStates[button.text] = false
