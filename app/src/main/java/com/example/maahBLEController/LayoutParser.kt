@@ -49,6 +49,7 @@ class LayoutParser(
             val cell = buttons.getJSONObject(i)
             buttonList = buttonList +
                 ButtonConfig(
+                    type = cell.getString("type"),
                     text = cell.getString("text"),
                     textColor = cell.getString("textColor"),
                     fontSize = cell.getInt("textFontSize"),

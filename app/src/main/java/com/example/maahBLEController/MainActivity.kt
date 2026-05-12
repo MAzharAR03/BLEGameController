@@ -29,6 +29,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,7 +37,6 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -50,30 +50,26 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
-import java.lang.System
 
 
 import java.util.UUID
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.sqrt
 
 private const val PERMISSION_REQUEST_CODE = 1
 // Example UUIDs — generate your own unique ones if needed
 private val phoneIOServiceUuid: UUID = UUID.fromString("0000feed-0000-1000-8000-00805f9b34fb")
 
-private val buttonCharUuid: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
-private val tiltCharUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
-private val stepCharUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
-private val controlCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35")
-private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+private val inputCharUUID: UUID = UUID.fromString("0000beef-0000-1000-8000-00805f9b34fb")
+private val pauseUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545640")
+private val screenshotUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
+private val controlCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35") // UUID for sending control messages (file transfer start and stop)
+private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb") // UUID for notifying on characteristic
 
-private val fileTransferCharUUID: UUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b")
+private val fileTransferCharUUID: UUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b") // UUID for transfering layouts and images
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
-    private var buttonCharacteristic: BluetoothGattCharacteristic? = null
-    private var tiltCharacteristic: BluetoothGattCharacteristic? = null
-    private var stepCharacteristic: BluetoothGattCharacteristic? = null
+    private var inputCharacteristic: BluetoothGattCharacteristic? = null
+    private var pauseCharacteristic: BluetoothGattCharacteristic? = null
+    private var screenshotCharacteristic: BluetoothGattCharacteristic? = null
     private var messageCharacteristic: BluetoothGattCharacteristic? = null
     private var layoutCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
@@ -86,7 +82,7 @@ class MainActivity : ComponentActivity() {
             context = this,
             scope = this.lifecycleScope,
             onReport = {
-                jsonString -> writeToChar(jsonString, buttonCharUuid, confirm = false) }
+                jsonString -> writeToChar(jsonString, inputCharUUID, confirm = false) }
     )
 }
     private val TILT_UPDATE_INTERVAL_MS = 0L
@@ -167,22 +163,30 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("controller"){
-                        val activity = LocalContext.current as Activity
+                        val activity = LocalActivity.current
 
                         DisposableEffect(Unit){
-                            val originalOrientation = activity.requestedOrientation
-                            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            val originalOrientation = activity?.requestedOrientation
+                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
                             onDispose {
-                                activity.requestedOrientation = originalOrientation
+                                if (originalOrientation != null) {
+                                    activity.requestedOrientation = originalOrientation
+                                }
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
                         }
                         AdvertiseScreen(
                             uiLayout = uiLayout,
                             onButtonStateChanged = {
-                                name, isPressed -> inputManager.updateButtonState(name, isPressed)
+                                name, isPressed ->
+                                val btn = uiLayout.buttons.find {it.text == name }
+                                when (btn?.type) {
+                                    "screenshot" -> if (isPressed) writeToChar("Screenshot", screenshotUUID, confirm = false)
+                                    "pause" -> if (isPressed) writeToChar("Pause", pauseUUID, confirm = false)
+                                    else -> inputManager.updateButtonState(name, isPressed)
+                                }
                             }
                         )
 
@@ -291,35 +295,35 @@ class MainActivity : ComponentActivity() {
             return
         }
         bluetoothGattServer = bluetoothManager.openGattServer(this, gattServerCallback)
-        buttonCharacteristic = BluetoothGattCharacteristic(
-            buttonCharUuid,
+        inputCharacteristic = BluetoothGattCharacteristic(
+            inputCharUUID,
             BluetoothGattCharacteristic.PROPERTY_NOTIFY or
                     BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_READ
         )
-        buttonCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+        inputCharacteristic?.addDescriptor(BluetoothGattDescriptor(
             CCCDUUID,
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
-        tiltCharacteristic = BluetoothGattCharacteristic(
-            tiltCharUUID,
+        pauseCharacteristic = BluetoothGattCharacteristic(
+            pauseUUID,
             BluetoothGattCharacteristic.PROPERTY_NOTIFY or
                     BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_READ
         )
 
-        tiltCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+        pauseCharacteristic?.addDescriptor(BluetoothGattDescriptor(
             CCCDUUID,
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
-        stepCharacteristic = BluetoothGattCharacteristic(
-            stepCharUUID,
+        screenshotCharacteristic = BluetoothGattCharacteristic(
+            screenshotUUID,
             BluetoothGattCharacteristic.PROPERTY_NOTIFY or
                     BluetoothGattCharacteristic.PROPERTY_READ,
             BluetoothGattCharacteristic.PERMISSION_READ
         )
 
-        stepCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+        screenshotCharacteristic?.addDescriptor(BluetoothGattDescriptor(
             CCCDUUID,
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ))
 
@@ -347,9 +351,9 @@ class MainActivity : ComponentActivity() {
             phoneIOServiceUuid,
             BluetoothGattService.SERVICE_TYPE_PRIMARY)
         //add the characteristic to the service
-        phoneIOService.addCharacteristic(buttonCharacteristic)
-        phoneIOService.addCharacteristic(tiltCharacteristic)
-        phoneIOService.addCharacteristic(stepCharacteristic)
+        phoneIOService.addCharacteristic(inputCharacteristic)
+        phoneIOService.addCharacteristic(pauseCharacteristic)
+        phoneIOService.addCharacteristic(screenshotCharacteristic)
         phoneIOService.addCharacteristic(messageCharacteristic)
         phoneIOService.addCharacteristic(layoutCharacteristic)
         bluetoothGattServer?.addService(phoneIOService)
@@ -546,9 +550,9 @@ class MainActivity : ComponentActivity() {
     private fun writeToChar(text: String, uuid: UUID, confirm: Boolean){
         val data = text.toByteArray()
         val characteristic = when(uuid){
-            buttonCharUuid -> buttonCharacteristic
-            tiltCharUUID -> tiltCharacteristic
-            stepCharUUID -> stepCharacteristic
+            inputCharUUID -> inputCharacteristic
+            pauseUUID -> pauseCharacteristic
+            screenshotUUID -> screenshotCharacteristic
             controlCharUUID -> messageCharacteristic
             else -> null
         }
@@ -561,7 +565,7 @@ class MainActivity : ComponentActivity() {
                     data
                 )
             } else {
-                buttonCharacteristic?.value = data
+                inputCharacteristic?.value = data
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
                     characteristic,

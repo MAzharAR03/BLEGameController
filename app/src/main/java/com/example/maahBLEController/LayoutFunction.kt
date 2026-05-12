@@ -53,6 +53,7 @@ interface ElementConfig{
     val yOffsetRel: Float
 }
 data class ButtonConfig (
+    val type: String = "regular",
     val text: String,
     val fontSize: Int,
     override val width: Float,
