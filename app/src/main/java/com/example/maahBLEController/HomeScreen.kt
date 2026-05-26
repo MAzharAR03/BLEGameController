@@ -21,9 +21,10 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun HomeScreen(
     context: Context,
+    refreshKey: Int = 0,
     onLayoutSelected: (String) -> Unit
 ) {
-    val layouts = remember {
+    val layouts = remember(refreshKey) {
         val assetFiles = context.assets.list("")?.filter { it.endsWith(".json") } ?: emptyList()
         val internalFiles = context.filesDir.list()?.filter { it.endsWith(".json")} ?: emptyList()
         (assetFiles + internalFiles).distinct().sorted()

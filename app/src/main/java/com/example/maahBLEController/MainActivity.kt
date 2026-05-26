@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
             emptyList(),
             emptyList(),
             ""))
+    var layoutRefreshKey by mutableStateOf(0)
     var connectionState by mutableStateOf(ConnectionState.IDLE)
     private var lastPingTime = 0L
     private var heartbeatMonitorJob: Job? = null
@@ -170,6 +171,7 @@ class MainActivity : ComponentActivity() {
                     composable("home"){
                         HomeScreen(
                             context = appContext,
+                            refreshKey = layoutRefreshKey,
                             onLayoutSelected = {
                                 filename -> loadLayout(filename)
                                 navController.navigate("controller")
@@ -178,17 +180,13 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("controller"){
-                        val activity = LocalActivity.current
-
                         DisposableEffect(Unit){
-                            val originalOrientation = activity?.requestedOrientation
-                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            val originalOrientation = this@MainActivity.requestedOrientation
+                            this@MainActivity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
                             onDispose {
-                                if (originalOrientation != null) {
-                                    activity.requestedOrientation = originalOrientation
-                                }
+                                this@MainActivity.requestedOrientation = originalOrientation
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
                         }
@@ -536,6 +534,7 @@ class MainActivity : ComponentActivity() {
                                     if(fileReceiver.getFilename().endsWith(".json")){
                                         runOnUiThread {
                                             loadLayout(filename = fileReceiver.getFilename())
+                                            layoutRefreshKey++
                                         }
                                     }
                                 }
@@ -631,7 +630,7 @@ class MainActivity : ComponentActivity() {
                     data
                 )
             } else {
-                inputCharacteristic?.value = data
+                characteristic?.value = data
                 bluetoothGattServer?.notifyCharacteristicChanged(
                     device,
                     characteristic,
