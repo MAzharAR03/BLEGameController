@@ -27,6 +27,7 @@ import android.os.ParcelUuid
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -34,8 +35,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -50,6 +55,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.maahBLEController.ui.theme.BLEAdvertiseTheme
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 import java.util.UUID
@@ -63,8 +71,11 @@ private val pauseUUID: UUID = UUID.fromString("446be5b0-93b7-4911-abbe-e4e18d545
 private val screenshotUUID: UUID = UUID.fromString("36d942a6-9e79-4812-8a8f-84a275f6b176")
 private val controlCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133466ef8e35") // UUID for sending control messages (file transfer start and stop)
 private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb") // UUID for notifying on characteristic
-
+private val heartbeatCharUUID: UUID = UUID.fromString("a5307aef-3109-42f7-b79e-a493856823ba")
 private val fileTransferCharUUID: UUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b") // UUID for transfering layouts and images
+
+
+enum class ConnectionState { IDLE, CONNECTED, DISCONNECTED}
 @SuppressLint("MissingPermission")
 class MainActivity : ComponentActivity() {
     private var inputCharacteristic: BluetoothGattCharacteristic? = null
@@ -72,6 +83,7 @@ class MainActivity : ComponentActivity() {
     private var screenshotCharacteristic: BluetoothGattCharacteristic? = null
     private var messageCharacteristic: BluetoothGattCharacteristic? = null
     private var layoutCharacteristic: BluetoothGattCharacteristic? = null
+    private var heartbeatCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private var bluetoothGattServer: BluetoothGattServer? = null
@@ -105,6 +117,9 @@ class MainActivity : ComponentActivity() {
             emptyList(),
             emptyList(),
             ""))
+    var connectionState by mutableStateOf(ConnectionState.IDLE)
+    private var lastPingTime = 0L
+    private var heartbeatMonitorJob: Job? = null
     private lateinit var fileReceiver: FileReceiver
 //    private fun copyDefaultLayout(){
 //        val targetFile = File(filesDir,"DefaultLayout.json")
@@ -179,6 +194,11 @@ class MainActivity : ComponentActivity() {
                         }
                         AdvertiseScreen(
                             uiLayout = uiLayout,
+                            connectionState = connectionState,
+                            onDisconnectConfirmed = {
+                                connectionState = ConnectionState.IDLE
+                                navController.popBackStack()
+                            },
                             onButtonStateChanged = {
                                 name, isPressed ->
                                 val btn = uiLayout.buttons.find {it.text == name }
@@ -210,6 +230,16 @@ class MainActivity : ComponentActivity() {
         inputManager.startListening()
 
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        connectedDevice?.let { bluetoothGattServer?.cancelConnection(it)}
+        bluetoothGattServer?.close()
+        bluetoothGattServer = null
+        isGattServerSetup = false
+        bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
+    }
+
     private fun Activity.requestRelevantRuntimePermissions() {
         if(hasRequiredBluetoothPermissions()) {return}
         when{
@@ -346,7 +376,16 @@ class MainActivity : ComponentActivity() {
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
 
-
+        heartbeatCharacteristic = BluetoothGattCharacteristic(
+            heartbeatCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE or
+                    BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PERMISSION_WRITE
+        )
+        heartbeatCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+            CCCDUUID,
+            BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ
+        ))
         val phoneIOService = BluetoothGattService(
             phoneIOServiceUuid,
             BluetoothGattService.SERVICE_TYPE_PRIMARY)
@@ -356,10 +395,27 @@ class MainActivity : ComponentActivity() {
         phoneIOService.addCharacteristic(screenshotCharacteristic)
         phoneIOService.addCharacteristic(messageCharacteristic)
         phoneIOService.addCharacteristic(layoutCharacteristic)
+        phoneIOService.addCharacteristic(heartbeatCharacteristic)
         bluetoothGattServer?.addService(phoneIOService)
 
         isGattServerSetup = true
     }
+    private fun startHeartbeatMonitor() {
+        heartbeatMonitorJob?.cancel()
+        heartbeatMonitorJob = lifecycleScope.launch {
+            while (true) {
+                delay(1000)
+                if (System.currentTimeMillis() - lastPingTime > 8000) {
+                    if (connectionState == ConnectionState.CONNECTED) {
+                        connectionState = ConnectionState.DISCONNECTED
+                    }
+                }
+                break
+            }
+        }
+    }
+
+
     private fun restartGattServer(){
         if(isGattServerSetup){
             bluetoothGattServer?.close()
@@ -376,9 +432,14 @@ class MainActivity : ComponentActivity() {
             super.onConnectionStateChange(device, status, newState)
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connectedDevice = device
+                lastPingTime = System.currentTimeMillis()
+                connectionState = ConnectionState.CONNECTED
+                startHeartbeatMonitor()
                 Log.i("GATT", "Device connected: ${device.address}")
             } else {
                 connectedDevice = null
+                heartbeatMonitorJob?.cancel()
+                connectionState = ConnectionState.DISCONNECTED
                 restartGattServer()
                 Log.i("GATT", "Device disconnected: ${device.address}")
             }
@@ -487,6 +548,10 @@ class MainActivity : ComponentActivity() {
                     fileTransferCharUUID -> {
                         fileReceiver.handleFileTransfer(value)
                     }
+                    heartbeatCharUUID -> {
+                        lastPingTime = System.currentTimeMillis()
+                        writeToChar("PONG", heartbeatCharUUID, confirm = false)
+                    }
                     else -> {
                         Log.d("BLE", "Write to unknown characteristic")
                     }
@@ -554,6 +619,7 @@ class MainActivity : ComponentActivity() {
             pauseUUID -> pauseCharacteristic
             screenshotUUID -> screenshotCharacteristic
             controlCharUUID -> messageCharacteristic
+            heartbeatCharUUID -> heartbeatCharacteristic
             else -> null
         }
         connectedDevice?.let {device ->
@@ -620,7 +686,26 @@ fun Context.hasRequiredBluetoothPermissions(): Boolean {
 fun AdvertiseScreen(
     onButtonStateChanged: (String, Boolean) -> Unit,
     uiLayout: UIConfig,
+    connectionState: ConnectionState,
+    onDisconnectConfirmed: () -> Unit,
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(connectionState) {
+        if (connectionState == ConnectionState.CONNECTED){
+            Toast.makeText(context, "Conntected to PC", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    if (connectionState == ConnectionState.DISCONNECTED){
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Disconnected")},
+            text = { Text("The PC server disconnected unexpectedly.")},
+            confirmButton = {
+                Button(onClick = onDisconnectConfirmed) {Text("OK")}
+            }
+        )
+    }
     PixelLayout(uiLayout,onButtonStateChanged)
 }
 
