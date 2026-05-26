@@ -94,7 +94,8 @@ class MainActivity : ComponentActivity() {
         InputManager (
             context = this,
             scope = this.lifecycleScope,
-            onStep = {writeToChar("Step",stepCharUUID, confirm = false)},
+            onStep = {
+                writeToChar("Step",stepCharUUID, confirm = false)},
             onReport = {
                 jsonString -> writeToChar(jsonString, inputCharUUID, confirm = false) }
     )
@@ -403,6 +404,7 @@ class MainActivity : ComponentActivity() {
         phoneIOService.addCharacteristic(messageCharacteristic)
         phoneIOService.addCharacteristic(layoutCharacteristic)
         phoneIOService.addCharacteristic(heartbeatCharacteristic)
+        phoneIOService.addCharacteristic(stepCharacteristic)
         bluetoothGattServer?.addService(phoneIOService)
 
         isGattServerSetup = true
@@ -628,6 +630,7 @@ class MainActivity : ComponentActivity() {
             screenshotUUID -> screenshotCharacteristic
             controlCharUUID -> messageCharacteristic
             heartbeatCharUUID -> heartbeatCharacteristic
+            stepCharUUID -> stepCharacteristic
             else -> null
         }
         connectedDevice?.let {device ->
