@@ -73,7 +73,7 @@ private val controlCharUUID: UUID = UUID.fromString("4a55006e-990a-4737-9634-133
 private val CCCDUUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb") // UUID for notifying on characteristic
 private val heartbeatCharUUID: UUID = UUID.fromString("a5307aef-3109-42f7-b79e-a493856823ba")
 private val fileTransferCharUUID: UUID = UUID.fromString("efcdbf7b-fee2-489b-8f79-b649aa50619b") // UUID for transfering layouts and images
-
+private val stepCharUUID: UUID = UUID.fromString("c36f600d-a202-48cd-a839-7577abea4b1f")
 
 enum class ConnectionState { IDLE, CONNECTED, DISCONNECTED}
 @SuppressLint("MissingPermission")
@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
     private var messageCharacteristic: BluetoothGattCharacteristic? = null
     private var layoutCharacteristic: BluetoothGattCharacteristic? = null
     private var heartbeatCharacteristic: BluetoothGattCharacteristic? = null
+    private var stepCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private var bluetoothGattServer: BluetoothGattServer? = null
@@ -93,14 +94,11 @@ class MainActivity : ComponentActivity() {
         InputManager (
             context = this,
             scope = this.lifecycleScope,
+            onStep = {writeToChar("Step",stepCharUUID, confirm = false)},
             onReport = {
                 jsonString -> writeToChar(jsonString, inputCharUUID, confirm = false) }
     )
 }
-    private val TILT_UPDATE_INTERVAL_MS = 0L
-    private var lastTiltSpendTime = 0L
-    private var lastSentTilt : Double = 0.0
-    private val TILT_THRESHOLD = 0.01
     private var isGattServerSetup = false
     private lateinit var appContext: Context
 
@@ -381,6 +379,17 @@ class MainActivity : ComponentActivity() {
             BluetoothGattCharacteristic.PERMISSION_WRITE
         )
         heartbeatCharacteristic?.addDescriptor(BluetoothGattDescriptor(
+            CCCDUUID,
+            BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ
+        ))
+
+        stepCharacteristic = BluetoothGattCharacteristic(
+            stepCharUUID,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+
+        stepCharacteristic?.addDescriptor(BluetoothGattDescriptor(
             CCCDUUID,
             BluetoothGattDescriptor.PERMISSION_WRITE or BluetoothGattDescriptor.PERMISSION_READ
         ))

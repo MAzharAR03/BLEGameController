@@ -8,7 +8,8 @@ import kotlin.math.sqrt
 
 class ManualStepDetector(
     linearAccelerometer: LinearAccelerometer,
-    gravity: Gravity
+    gravity: Gravity,
+    private val onStep: (()-> Unit)? = null
 ) {
     // minimum threshold for Linear Acceleration to pass to count as a step. Filters out noise like small bumps
     private val NOISE_THRESHOLD = 1.0
@@ -82,6 +83,7 @@ class ManualStepDetector(
                 lastSentTime = System.currentTimeMillis()
                 lastStepTime = System.currentTimeMillis()
                 stepCounter.value++
+                onStep?.invoke()
                 Log.d("STEP","Step detected! Peak: $peak, Threshold: $adaptiveThreshold")
             }
             peaks[peakCount % PEAK_BUFFER_SIZE] = peak

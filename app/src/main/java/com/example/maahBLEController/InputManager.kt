@@ -18,6 +18,7 @@ import org.json.JSONObject
 class InputManager(
     private val context : Context,
     private val scope: CoroutineScope,
+    private val onStep: () -> Unit,
     private val onReport : (String) -> Unit
     ) {
 
@@ -35,7 +36,8 @@ class InputManager(
     )
     private var stepDetector = ManualStepDetector(
         linearAccelerometer = linearAccelerometer,
-        gravity = gravity
+        gravity = gravity, 
+        onStep = { onStep() }
     )
 
 
