@@ -222,7 +222,6 @@ class MainActivity : ComponentActivity() {
         if (!bluetoothAdapter.isEnabled) {
             promptEnableBluetooth()
         }
-        startAdvertising()
         inputManager.setupSensors()
         inputManager.startListening()
 
@@ -377,7 +376,7 @@ class MainActivity : ComponentActivity() {
             heartbeatCharUUID,
             BluetoothGattCharacteristic.PROPERTY_WRITE or
                     BluetoothGattCharacteristic.PROPERTY_NOTIFY,
-            BluetoothGattCharacteristic.PERMISSION_WRITE
+            BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
         )
         heartbeatCharacteristic?.addDescriptor(BluetoothGattDescriptor(
             CCCDUUID,
@@ -432,6 +431,8 @@ class MainActivity : ComponentActivity() {
             isGattServerSetup = false
             bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
             setupGattServer()
+            startAdvertising()
+            Log.d("BLE","GATT Server restarted")
         }
     }
 
@@ -591,6 +592,7 @@ class MainActivity : ComponentActivity() {
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
+                .setTimeout(0)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .build()
 
