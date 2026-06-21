@@ -60,7 +60,9 @@ class InputManager(
     private var currentRoll = 0.0
     private var currentGravity: List<Float> = listOf(0f,0f,0f)
     private var currentLinearAccel = listOf(0f,0f,0f)
-
+    private var rollOffset = 0.0
+    private var rawRoll = 0.0
+    private var isCalibrated = false
     private fun calculatePitch(x: Float, y: Float, z: Float): Double {
         return atan2(-y.toDouble(), sqrt(x * x + z * z).toDouble())
     }
@@ -83,6 +85,7 @@ class InputManager(
                 val controllerState = JSONObject()
                 try{
                     controllerState.put("stepping",stepDetector.isCurrentlyStepping)
+                    controllerState.put("roll", currentRoll)
                     controllerState.put("pitch",currentPitch)
                     val buttonArray = JSONArray()
                     buttonStates.forEach {
@@ -141,12 +144,25 @@ class InputManager(
     fun setupSensors(){
         accelerometer.setOnSensorValuesChangedListener { values ->
             currentPitch = calculatePitch(values[0], values[1], values[2])
-            currentRoll = calculateRoll(values[0], values[1], values[2])
+            rawRoll = calculateRoll(values[0], values[1], values[2])
+            if (!isCalibrated) {
+                rollOffset = rawRoll
+                isCalibrated = true
+            }
+            currentRoll = rawRoll - rollOffset
         }
         linearAccelerometer.setOnSensorValuesChangedListener { values ->
             currentLinearAccel = values
             stepDetector.updateValues(currentGravity,currentLinearAccel)}
         gravity.setOnSensorValuesChangedListener { values -> currentGravity = values}
 
+    }
+
+    fun recenter() {
+        rollOffset = rawRoll
+    }
+
+    fun resetCalibration() {
+        isCalibrated = false
     }
 }

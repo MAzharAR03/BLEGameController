@@ -25,8 +25,8 @@ fun HomeScreen(
     onLayoutSelected: (String) -> Unit
 ) {
     val layouts = remember(refreshKey) {
-        val assetFiles = context.assets.list("")?.filter { it.endsWith(".json") } ?: emptyList()
-        val internalFiles = context.filesDir.list()?.filter { it.endsWith(".json")} ?: emptyList()
+        val assetFiles = context.assets.list("")?.filter { it.endsWith(".layout") } ?: emptyList()
+        val internalFiles = context.filesDir.list()?.filter { it.endsWith(".layout")} ?: emptyList()
         (assetFiles + internalFiles).distinct().sorted()
     }
 

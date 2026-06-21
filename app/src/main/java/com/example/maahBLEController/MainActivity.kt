@@ -122,8 +122,8 @@ class MainActivity : ComponentActivity() {
     private var heartbeatMonitorJob: Job? = null
     private lateinit var fileReceiver: FileReceiver
 //    private fun copyDefaultLayout(){
-//        val targetFile = File(filesDir,"DefaultLayout.json")
-//        assets.open("DefaultLayout.json").use {
+//        val targetFile = File(filesDir,"DefaultLayout.layout")
+//        assets.open("DefaultLayout.layout").use {
 //            input -> targetFile.outputStream().use {
 //                output -> input.copyTo(output)
 //        }
@@ -202,6 +202,7 @@ class MainActivity : ComponentActivity() {
                                 when (btn?.type) {
                                     "screenshot" -> if (isPressed) writeToChar("Screenshot", screenshotUUID, confirm = false)
                                     "pause" -> if (isPressed) writeToChar("Pause", pauseUUID, confirm = false)
+                                    "recenter" -> if(isPressed) inputManager.recenter()
                                     else -> inputManager.updateButtonState(name, isPressed)
                                 }
                             }
@@ -225,7 +226,14 @@ class MainActivity : ComponentActivity() {
         startAdvertising()
         inputManager.setupSensors()
         inputManager.startListening()
+        inputManager.resetCalibration()
 
+    }
+
+    override fun onPause() {
+        super.onPause()
+        writeToChar("Pause", pauseUUID, confirm = false)
+        inputManager.stopListening()
     }
 
     override fun onDestroy() {
@@ -542,7 +550,7 @@ class MainActivity : ComponentActivity() {
                             message.startsWith("END") -> {
                                 fileReceiver.handleEnd()
                                 if(fileReceiver.isTransferComplete()){
-                                    if(fileReceiver.getFilename().endsWith(".json")){
+                                    if(fileReceiver.getFilename().endsWith(".layout")){
                                         runOnUiThread {
                                             loadLayout(filename = fileReceiver.getFilename())
                                             layoutRefreshKey++
